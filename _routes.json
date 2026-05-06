@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/styles.css",
+    "/client.js",
+    "/favicon.svg",
+    "/logo-mark.svg",
+    "/og-cover.svg",
+    "/robots.txt"
+  ]
+}

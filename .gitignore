@@ -1,0 +1,9 @@
+.wrangler/
+node_modules/
+.DS_Store
+.env
+.env.local
+*.log
+.vscode/
+.idea/
+.claude/

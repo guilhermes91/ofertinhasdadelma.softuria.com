@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff3e6"/>
+      <stop offset="100%" stop-color="#ffe6ee"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff7aa2"/>
+      <stop offset="100%" stop-color="#e64a6e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="990" cy="160" r="180" fill="#f7a440" opacity="0.2"/>
+  <circle cx="120" cy="500" r="220" fill="#e64a6e" opacity="0.12"/>
+  <g transform="translate(80,150)">
+    <g transform="translate(0,0)">
+      <path d="M30 0h120a30 30 0 0 1 30 30v27c0 49.7-32.24 90-90 90S0 106.7 0 57V30A30 30 0 0 1 30 0z" fill="url(#mark)"/>
+      <path d="M42 60c0-9.94 8.06-18 18-18 6.54 0 12.24 3.48 15.43 8.67C78.62 45.48 84.32 42 90.86 42c9.94 0 18 8.06 18 18 0 20.12-33.43 38.12-33.43 38.12S42 80.12 42 60z" fill="#fff"/>
+    </g>
+    <text x="220" y="60" font-family="Manrope, Arial, sans-serif" font-size="48" font-weight="800" fill="#1f1d2b">Ofertinhas da Delma</text>
+    <text x="220" y="105" font-family="Inter, Arial, sans-serif" font-size="24" fill="#6b6478">achadinhos com preço bom todo dia</text>
+  </g>
+  <text x="80" y="430" font-family="Manrope, Arial, sans-serif" font-size="64" font-weight="800" fill="#1f1d2b">Achadinhos garimpados</text>
+  <text x="80" y="500" font-family="Manrope, Arial, sans-serif" font-size="64" font-weight="800" fill="#e64a6e">com calma e carinho.</text>
+  <text x="80" y="560" font-family="Inter, Arial, sans-serif" font-size="26" fill="#4a4658">Produto bom, preço justo, link direto. Sem enrolação.</text>
+</svg>

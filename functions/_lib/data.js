@@ -1,0 +1,196 @@
+// Storage + helpers for the Ofertinhas catalog. Single KV key holds the whole list.
+const KEY = "offers:all";
+
+export async function loadOffers(env) {
+  const raw = await env.OFFERS_KV.get(KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveOffers(env, offers) {
+  await env.OFFERS_KV.put(KEY, JSON.stringify(offers));
+}
+
+export function newId() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Combining diacritical marks: U+0300 to U+036F. Build the regex from
+// codepoints via String.fromCharCode so the bundler can't mis-encode it.
+const DIACRITICS = new RegExp(
+  "[" + String.fromCharCode(0x0300) + "-" + String.fromCharCode(0x036f) + "]",
+  "g"
+);
+
+export function slugify(value, max = 70) {
+  if (!value) return "";
+  const s = String(value)
+    .normalize("NFD")
+    .replace(DIACRITICS, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, max)
+    .replace(/-+$/g, "");
+  return s || "oferta";
+}
+
+export function uniqueSlug(base, existing) {
+  const taken = new Set(existing);
+  if (!taken.has(base)) return base;
+  let i = 2;
+  while (taken.has(`${base}-${i}`)) i += 1;
+  return `${base}-${i}`;
+}
+
+export function ensureOffer(offer) {
+  const o = offer || {};
+  const tags = Array.isArray(o.tags)
+    ? o.tags
+        .map((t) => slugify(t))
+        .filter((t) => t && t !== "oferta")
+        .slice(0, 5)
+    : [];
+  const priceCurrent = numberOrNull(o.priceCurrent);
+  const priceOld = numberOrNull(o.priceOld);
+  let discount = numberOrNull(o.discount);
+  if ((!discount || discount < 1) && priceOld && priceCurrent && priceOld > priceCurrent) {
+    discount = Math.round(((priceOld - priceCurrent) / priceOld) * 100);
+  }
+  return {
+    id: o.id || newId(),
+    slug: o.slug || slugify(o.title || "oferta"),
+    addedAt: o.addedAt || new Date().toISOString(),
+    title: stringOrEmpty(o.title),
+    description: stringOrEmpty(o.description),
+    seoTitle: stringOrEmpty(o.seoTitle),
+    seoDescription: stringOrEmpty(o.seoDescription),
+    image: stringOrEmpty(o.image),
+    imageAlt: stringOrEmpty(o.imageAlt) || stringOrEmpty(o.title),
+    priceCurrent: priceCurrent || 0,
+    priceOld: priceOld || null,
+    discount: discount || null,
+    link: stringOrEmpty(o.link),
+    tags,
+    bestseller: !!o.bestseller,
+    isNew: o.isNew !== false,
+    seller: stringOrEmpty(o.seller) || "Mercado Livre"
+  };
+}
+
+function numberOrNull(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function stringOrEmpty(v) {
+  return v == null ? "" : String(v).trim();
+}
+
+export function sortByDateDesc(offers) {
+  return offers.slice().sort((a, b) => {
+    const da = new Date(a.addedAt || 0).getTime();
+    const db = new Date(b.addedAt || 0).getTime();
+    return db - da;
+  });
+}
+
+export function paginate(items, page, perPage = 12) {
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const current = Math.min(Math.max(1, page | 0 || 1), totalPages);
+  const start = (current - 1) * perPage;
+  return {
+    items: items.slice(start, start + perPage),
+    page: current,
+    perPage,
+    total,
+    totalPages
+  };
+}
+
+export function searchOffers(offers, query) {
+  const q = (query || "").trim().toLowerCase();
+  if (!q) return offers;
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return offers.filter((o) => {
+    const haystack = [
+      o.title,
+      o.description,
+      o.seoTitle,
+      o.seoDescription,
+      (o.tags || []).join(" ")
+    ]
+      .join(" ")
+      .toLowerCase();
+    return tokens.every((t) => haystack.includes(t));
+  });
+}
+
+export function offersByTag(offers, tag) {
+  const t = slugify(tag);
+  if (!t) return [];
+  return offers.filter((o) => (o.tags || []).includes(t));
+}
+
+export function tagCounts(offers) {
+  const counts = new Map();
+  for (const o of offers) {
+    for (const t of o.tags || []) {
+      counts.set(t, (counts.get(t) || 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .map(([slug, count]) => ({ slug, count, label: humanizeTag(slug) }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export function humanizeTag(slug) {
+  if (!slug) return "";
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
+}
+
+export function brl(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export function escapeHtml(value) {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function safeUrl(value) {
+  const raw = String(value || "").trim();
+  if (!/^https?:\/\//i.test(raw)) return "";
+  return raw.replace(/"/g, "%22");
+}
+
+export function isMercadoLivreUrl(value) {
+  try {
+    const u = new URL(value);
+    return /(?:^|\.)meli\.la$|(?:^|\.)mercadolivre\.com\.br$|(?:^|\.)mercadolivre\.com$|(?:^|\.)mlstatic\.com$/i.test(
+      u.hostname
+    );
+  } catch {
+    return false;
+  }
+}
