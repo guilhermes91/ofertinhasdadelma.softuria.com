@@ -93,16 +93,20 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 /* Tag strip under header */
 .tagstrip {
   display: flex; align-items: center;
-  column-gap: 14px; row-gap: 10px;
-  padding: 4px 24px 16px;
+  gap: 12px;
+  padding: 6px 24px 18px;
   flex-wrap: wrap;
 }
+.tagstrip > * { margin: 0; }
 .tagstrip__label {
-  font-size: .8rem; color: var(--muted); font-weight: 700;
-  text-transform: uppercase; letter-spacing: .06em;
-  padding-right: 6px; margin-right: 2px;
+  font-size: .78rem; color: var(--muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  padding-right: 14px;
+  margin-right: 4px;
   border-right: 1px solid var(--line);
+  line-height: 1.1;
 }
+.tagstrip .taglink + .taglink { margin-left: 0; }
 .taglink {
   display: inline-flex; align-items: center;
   padding: 7px 14px;
@@ -112,12 +116,13 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   font-size: .85rem; font-weight: 500;
   color: var(--ink-soft);
   text-decoration: none;
+  white-space: nowrap;
   transition: background 200ms ease, color 200ms ease, border-color 200ms ease, transform 200ms ease;
 }
 .taglink:hover { border-color: var(--primary); color: var(--primary-strong); background: var(--primary-soft); transform: translateY(-1px); }
 @media (max-width: 640px) {
-  .tagstrip { column-gap: 10px; row-gap: 8px; padding: 4px 18px 14px; }
-  .tagstrip__label { width: 100%; border-right: 0; padding-right: 0; }
+  .tagstrip { gap: 10px; padding: 6px 18px 14px; }
+  .tagstrip__label { width: 100%; border-right: 0; padding-right: 0; padding-bottom: 4px; }
   .taglink { padding: 6px 12px; font-size: .82rem; }
 }
 
