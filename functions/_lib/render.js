@@ -64,7 +64,7 @@ export function layout({
   const safeDesc = escapeHtml(description || SITE.description);
   const url = canonical.startsWith("http") ? canonical : `${SITE.origin}${canonical}`;
   const og = ogImage || `${SITE.origin}/og-cover.svg`;
-  const tags = tagCounts(offers).slice(0, 10);
+  const tags = tagCounts(offers).slice(0, 5);
   const ldBlocks = (Array.isArray(jsonLd) ? jsonLd : [jsonLd])
     .filter(Boolean)
     .map((obj) => `<script type="application/ld+json">${JSON.stringify(obj)}</script>`)

@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
   const all = sortByDateDesc(await loadOffers(env));
   const filtered = searchOffers(all, q);
   const view = paginate(filtered, page, 12);
-  const tags = tagCounts(all).slice(0, 10);
+  const tags = tagCounts(all).slice(0, 5);
 
   const heroBlock = q
     ? heroSearch(q, filtered.length)
