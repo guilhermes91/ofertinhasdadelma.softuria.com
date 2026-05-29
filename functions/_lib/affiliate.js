@@ -4,7 +4,7 @@
 // rotação/cloaking). Degrada com segurança: sem config/sessão → retorna null.
 
 const BASE = "https://www.mercadolivre.com.br";
-const LINKS_API = "/affiliate-program/api/v2/stripe/user/links";
+const LINKS_API = "/affiliate-program/api/v2/affiliates/createLink";
 const LINKBUILDER = "/afiliados/linkbuilder";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
@@ -100,24 +100,33 @@ export async function mlAffiliateLink(productUrl, tag, cookieStr) {
     headers: {
       ...H,
       "Content-Type": "application/json",
-      Accept: "application/json",
+      Accept: "application/json, text/plain, */*",
       Cookie: cookies,
       "x-csrf-token": csrf,
       Referer: BASE + LINKBUILDER,
       Origin: BASE
     },
-    body: JSON.stringify({ url: productUrl, tag })
+    // endpoint real: createLink, body com urls[] + tag (validado no browser).
+    body: JSON.stringify({ urls: [productUrl], tag })
   });
   cookies = mergeSetCookies(cookies, r);
-  if (r.status !== 200) return { error: r.status, cookies };
+  if (r.status !== 200) return { error: r.status, detail: (await r.text()).slice(0, 200), cookies };
   let data;
   try { data = await r.json(); } catch { return { error: "json", cookies }; }
-  // Campo do link pode variar; tenta os mais prováveis e devolve raw p/ confirmar.
-  const link =
-    data.short_url || data.shortUrl || data.url || data.link || data.short ||
-    (Array.isArray(data.urls) ? data.urls[0] : null) ||
-    (Array.isArray(data.links) ? (data.links[0]?.url || data.links[0]) : null);
-  return { link: typeof link === "string" ? link : null, raw: data, cookies };
+  return { link: extractAffiliateLink(data), raw: data, cookies };
+}
+
+// Extrai o link de afiliado da resposta do createLink (shape pode variar).
+function extractAffiliateLink(d) {
+  if (!d) return null;
+  const arr = d.links || d.urls || d.data || (Array.isArray(d) ? d : null);
+  if (Array.isArray(arr) && arr.length) {
+    const f = arr[0];
+    if (typeof f === "string") return f;
+    return f.short_url || f.shortUrl || f.url || f.link || null;
+  }
+  const v = d.short_url || d.shortUrl || d.url || d.link;
+  return typeof v === "string" ? v : null;
 }
 
 // Orquestrador: gera o NOSSO link de afiliado p/ uma URL de produto.
