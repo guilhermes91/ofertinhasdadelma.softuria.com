@@ -97,7 +97,7 @@ async function run(context) {
 
   return jsonResponse({
     ok: true,
-    source: "promotop",
+    source: "promotop+pechinchou",
     candidates: candidates.length,
     fresh: fresh.length,
     added: added.length,

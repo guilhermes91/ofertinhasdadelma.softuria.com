@@ -30,6 +30,9 @@ export const PROMOTOP_SOURCES = [
   "https://promotop.net/loja/mercado-livre",
   "https://promotop.net/"
 ];
+export const PECHINCHOU_SOURCES = [
+  "https://www.pechinchou.com.br/"
+];
 
 async function fetchHtml(url, fetchImpl) {
   const res = await fetchImpl(url, {
@@ -40,9 +43,9 @@ async function fetchHtml(url, fetchImpl) {
   return res.text();
 }
 
-export async function crawlPromotop(fetchImpl = fetch) {
+async function crawl(sources, fetchImpl) {
   const links = new Set();
-  for (const url of PROMOTOP_SOURCES) {
+  for (const url of sources) {
     try {
       const html = await fetchHtml(url, fetchImpl);
       for (const l of extractMlLinks(html)) links.add(l);
@@ -53,7 +56,15 @@ export async function crawlPromotop(fetchImpl = fetch) {
   return [...links];
 }
 
-// Agregador de descoberta. Por ora só Promotop.
+export const crawlPromotop = (fetchImpl = fetch) => crawl(PROMOTOP_SOURCES, fetchImpl);
+export const crawlPechinchou = (fetchImpl = fetch) => crawl(PECHINCHOU_SOURCES, fetchImpl);
+
+// Agregador de descoberta: Promotop + Pechinchou (ambos expõem links de ML no
+// HTML server-side). Dedup global por link.
 export async function discoverMlOffers(fetchImpl = fetch) {
-  return crawlPromotop(fetchImpl);
+  const groups = await Promise.all([
+    crawl(PROMOTOP_SOURCES, fetchImpl),
+    crawl(PECHINCHOU_SOURCES, fetchImpl)
+  ]);
+  return [...new Set(groups.flat())];
 }
