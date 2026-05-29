@@ -3,6 +3,7 @@ import {
   paginate,
   searchOffers,
   sortByDateDesc,
+  sortOffers,
   tagCounts,
   humanizeTag,
   escapeHtml
@@ -39,9 +40,10 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") || "").trim();
   const page = parseInt(url.searchParams.get("page") || "1", 10) || 1;
+  const sort = url.searchParams.get("sort") || "recentes";
 
   const all = sortByDateDesc(await loadOffers(env));
-  const filtered = searchOffers(all, q);
+  const filtered = sortOffers(searchOffers(all, q), sort);
   const view = paginate(filtered, page, 12);
   const tags = tagCounts(all).slice(0, 5);
 
@@ -79,9 +81,10 @@ export async function onRequestGet(context) {
           <p>${
             q
               ? `${filtered.length} ${filtered.length === 1 ? "achadinho" : "achadinhos"} encontrados.`
-              : "As mais novas aparecem primeiro. Achou bom? É só clicar e aproveitar."
+              : "Garimpo diário, curado à mão. Escolhe como quer ver."
           }</p>
         </header>
+        ${feedTabs(sort, q)}
         ${offersBlock}
       </div>
     </section>
@@ -151,6 +154,29 @@ export async function onRequestGet(context) {
       searchQuery: q
     })
   );
+}
+
+function feedTabs(active, q) {
+  const enc = encodeURIComponent(q || "");
+  const tabs = [
+    { k: "recentes", label: "Recentes" },
+    { k: "desconto", label: "Maiores descontos" },
+    { k: "vendidas", label: "Mais vendidas" }
+  ];
+  return `<nav class="feedtabs" aria-label="Ordenar ofertas">${tabs
+    .map((t) => {
+      const href =
+        t.k === "recentes"
+          ? q
+            ? `/?q=${enc}`
+            : "/"
+          : q
+          ? `/?q=${enc}&sort=${t.k}`
+          : `/?sort=${t.k}`;
+      const cls = active === t.k ? "feedtab feedtab--active" : "feedtab";
+      return `<a class="${cls}" href="${href}"${active === t.k ? ' aria-current="true"' : ""}>${t.label}</a>`;
+    })
+    .join("")}</nav>`;
 }
 
 function hero() {

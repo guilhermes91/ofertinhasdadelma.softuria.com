@@ -9,7 +9,9 @@ export const SITE = {
   // SEO em modo local sem mexer em mais nenhum arquivo.
   region: "todo o Brasil",
   description:
-    "Achadinhos do Mercado Livre garimpados com carinho. Preço bom, link direto e curadoria diária, com entrega pra todo o Brasil."
+    "Achadinhos do Mercado Livre garimpados com carinho. Preço bom, link direto e curadoria diária, com entrega pra todo o Brasil.",
+  // Link do grupo/contato no WhatsApp (canal principal). Vazio = barra do topo escondida.
+  whatsapp: ""
 };
 
 export function htmlResponse(html, init = {}) {
@@ -110,17 +112,27 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="preconnect" href="https://http2.mlstatic.com" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=20260528b" />
+  <link rel="stylesheet" href="/styles.css?v=20260528c" />
   ${ldBlocks}
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  ${SITE.whatsapp ? topbar() : ""}
   ${header(searchQuery, tags)}
   <main id="conteudo">${body}</main>
   ${footer()}
   <script src="/client.js" defer></script>
 </body>
 </html>`;
+}
+
+export function topbar() {
+  return `
+    <a class="topbar" href="${escapeHtml(SITE.whatsapp)}" target="_blank" rel="noopener noreferrer">
+      <span class="topbar__txt">📲 Receba as melhores ofertas no WhatsApp</span>
+      <span class="topbar__cta">Entrar no grupo →</span>
+    </a>
+  `;
 }
 
 export function header(searchQuery = "", topTags = []) {

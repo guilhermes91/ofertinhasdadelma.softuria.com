@@ -61,6 +61,16 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 }
 .skip-link:focus { left: 16px; top: 16px; }
 
+/* ----- Top bar (WhatsApp) ----- */
+.topbar {
+  display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+  background: #25d366; color: #08331c;
+  padding: 9px 16px; font-size: .9rem; font-weight: 700; text-align: center;
+}
+.topbar:hover { color: #08331c; filter: brightness(.97); }
+.topbar__cta { background: rgba(255,255,255,.35); padding: 3px 12px; border-radius: var(--radius-pill); white-space: nowrap; }
+@media (max-width: 640px) { .topbar { font-size: .82rem; padding: 8px 14px; gap: 8px; } }
+
 /* ----- Header ----- */
 .site-header {
   position: sticky; top: 0; z-index: 50;
@@ -384,6 +394,19 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   border-radius: var(--radius-pill);
 }
 .offer-card__media:focus-visible { outline-offset: 0; border-radius: var(--radius-md); }
+
+/* Feed tabs (ordenação) */
+.feedtabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: -12px 0 28px; }
+.feedtab {
+  display: inline-flex; align-items: center; padding: 9px 16px;
+  border-radius: var(--radius-pill); background: #fff; border: 1px solid var(--line);
+  color: var(--ink-soft); font-weight: 600; font-size: .9rem;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.feedtab:hover { border-color: var(--primary); color: var(--primary-strong); }
+.feedtab--active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.feedtab--active:hover { color: #fff; }
+@media (max-width: 640px) { .feedtabs { gap: 6px; } .feedtab { padding: 8px 12px; font-size: .84rem; } }
 
 /* Pagination */
 .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 32px 0 8px; }

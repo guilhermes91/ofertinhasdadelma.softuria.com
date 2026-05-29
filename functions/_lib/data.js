@@ -103,6 +103,25 @@ export function sortByDateDesc(offers) {
   });
 }
 
+function dateMs(o) {
+  return new Date(o.addedAt || 0).getTime();
+}
+
+export function sortByDiscountDesc(offers) {
+  return offers.slice().sort((a, b) => (b.discount || 0) - (a.discount || 0) || dateMs(b) - dateMs(a));
+}
+
+export function sortByBestseller(offers) {
+  return offers.slice().sort((a, b) => (b.bestseller ? 1 : 0) - (a.bestseller ? 1 : 0) || dateMs(b) - dateMs(a));
+}
+
+// Ordenação do feed por chave de aba (default: recentes).
+export function sortOffers(offers, key) {
+  if (key === "desconto") return sortByDiscountDesc(offers);
+  if (key === "vendidas") return sortByBestseller(offers);
+  return sortByDateDesc(offers);
+}
+
 export function paginate(items, page, perPage = 12) {
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / perPage));

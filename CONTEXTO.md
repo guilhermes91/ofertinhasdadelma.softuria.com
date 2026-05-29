@@ -151,12 +151,19 @@ Arquivos tocados: `render.js` (config + description), `scraper.js` (prompt + fal
 com "Guarujá" — isso é dado, não código. Só some quando forem re-scrapeadas/editadas. Páginas
 locais (`/guaruja`, etc.) ficam como porta aberta, **não construída** (seria over-engineering agora).
 
-### 6.2 Redesign + SEO on-page  *(em andamento — WS2)*
-Alvo: cards/badges no estilo Promotop (o que o dono curtiu) + otimização de imagem estilo
-Canaltech + hierarquia/seções pra matar o "confuso" + engenharia SEO (schema, sitemap,
-performance/CLS, internal linking). Referências avaliadas: Promotop (WordPress, visual forte mas
-fraco técnico), Canaltech (Next.js, padrão-ouro de engenharia), Pelando (Astro, mas modelo de
-comunidade — não é o nosso).
+### 6.2 Redesign + SEO on-page  ✅ FEITO (validado com Playwright)
+Referência preferida do dono: **Pechinchou** ("cópia melhorada"). Entregue:
+- **Layout**: hero compacto + ofertas acima da dobra; card uniforme (loja+"há Xh" no topo,
+  preço em vermelho, preço/CTA fixos no rodapé → altura idêntica, sem overflow); página de
+  oferta com preço+CTA acima da dobra.
+- **Feature Pechinchou — abas do feed**: `?sort=` (Recentes / Maiores descontos / Mais vendidas),
+  SSR, canonical sem `sort` (sem dup content). Em `data.js` `sortOffers`.
+- **Feature Pechinchou — barra WhatsApp** (canal #1): `SITE.whatsapp` em `render.js`. **Vazio =
+  barra escondida.** Preencher com o link do grupo pra ativar.
+- **SEO**: Organization/FAQPage/Product schema, sitemap c/ imagens, relacionadas por tag.
+
+Não copiado de propósito (não é nosso modelo): votos/comentários (comunidade), login, chips
+multi-loja (somos ML-only). Possível futuro: cards horizontais no mobile (densidade).
 
 ### 6.3 Bot de captação automática  *(em andamento — WS3)*
 Decisão (dono): **scrape de portais** (não API oficial por ora), **só Mercado Livre** (Shopee
