@@ -165,6 +165,13 @@ Referência preferida do dono: **Pechinchou** ("cópia melhorada"). Entregue:
 Não copiado de propósito (não é nosso modelo): votos/comentários (comunidade), login, chips
 multi-loja (somos ML-only). Possível futuro: cards horizontais no mobile (densidade).
 
+### 6.4 Pivô para comunidade (cópia melhorada do Pechinchou)  *(planejado)*
+Decisão do dono (2026-05-28): copiar o Pechinchou de ponta a ponta + virar comunidade +
+"comissionar" quem publica. Brainstorm completo e roadmap por fases em **`docs/ROADMAP-COMUNIDADE.md`**.
+**🔴 Alerta jurídico (registrado):** rotação/cloaking de link de afiliado = **ban permanente** no
+ML (Termos). O modelo seguro é nosso link em tudo + recompensa ao contribuidor via pontos/creator
+payout (fora do trilho ML). Fase 2 (votos/comentários/contas) exige **D1 + login** (KV não basta).
+
 ### 6.3 Bot de captação automática  *(em andamento — WS3)*
 Decisão (dono): **scrape de portais** (não API oficial por ora), **só Mercado Livre** (Shopee
 depois), **auto-publicar** + manter captação pública por usuário. Cron a cada ~10 min.
