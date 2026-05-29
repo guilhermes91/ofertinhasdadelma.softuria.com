@@ -12,8 +12,13 @@ export async function loadOffers(env) {
   }
 }
 
+export const MAX_OFFERS = 500;
+
 export async function saveOffers(env, offers) {
-  await env.OFFERS_KV.put(KEY, JSON.stringify(offers));
+  let list = Array.isArray(offers) ? offers : [];
+  // teto de catálogo: mantém as 500 mais recentes (KV leve + site fresco)
+  if (list.length > MAX_OFFERS) list = sortByDateDesc(list).slice(0, MAX_OFFERS);
+  await env.OFFERS_KV.put(KEY, JSON.stringify(list));
 }
 
 export function newId() {

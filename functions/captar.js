@@ -15,6 +15,7 @@ import {
   brl
 } from "./_lib/data.js";
 import { layout, htmlResponse, SITE } from "./_lib/render.js";
+import { generateAffiliate } from "./_lib/affiliate.js";
 
 const RATE_LIMIT_SECONDS = 20;
 
@@ -74,10 +75,12 @@ async function handle(context, method) {
 
   try {
     const scraped = await scrapeOffer(target, env);
+    // gera o NOSSO link de afiliado (se configurado); senão mantém o original
+    const aff = await generateAffiliate(scraped.productUrl || target, env);
     const all = await loadOffers(env);
     const baseSlug = slugify(scraped.title || "oferta");
     const slug = uniqueSlug(baseSlug, all.map((o) => o.slug));
-    const candidate = ensureOffer({ ...scraped, slug, link: target });
+    const candidate = ensureOffer({ ...scraped, slug, link: aff || target });
     // repost: se o produto já existe, atualiza no lugar e sobe pro topo.
     const { offers: next, offer } = upsertOffer(all, candidate, { bumpToTop: true });
     await saveOffers(env, next);

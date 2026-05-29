@@ -17,6 +17,7 @@ import {
 } from "../_lib/data.js";
 import { jsonResponse } from "../_lib/render.js";
 import { discoverMlOffers } from "../_lib/portals.js";
+import { generateAffiliate, mlKeepalive } from "../_lib/affiliate.js";
 
 const DEFAULT_MAX = 8; // teto por execução — protege a cota do Gemini
 const HARD_MAX = 20;
@@ -54,6 +55,15 @@ async function run(context) {
   );
   const dry = url.searchParams.get("dry") === "1";
 
+  // keepalive da sessão de afiliado ML (se houver) pra não expirar
+  try {
+    const sess = await env.OFFERS_KV.get("ml:session");
+    if (sess) {
+      const k = await mlKeepalive(sess);
+      if (k.ok && k.cookies) await env.OFFERS_KV.put("ml:session", k.cookies);
+    }
+  } catch (_) { /* noop */ }
+
   let candidates = [];
   try {
     candidates = await discoverMlOffers();
@@ -86,7 +96,8 @@ async function run(context) {
         slugify(scraped.title || "oferta"),
         offers.map((o) => o.slug)
       );
-      const candidate = ensureOffer({ ...scraped, slug, link, seller: "Mercado Livre" });
+      const aff = await generateAffiliate(scraped.productUrl || link, env);
+      const candidate = ensureOffer({ ...scraped, slug, link: aff || link, seller: "Mercado Livre" });
       // dedup por id do produto; só refresca (e sobe) se o preço mudou — sem churn.
       const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
       offers = r.offers;

@@ -18,11 +18,16 @@ export async function scrapeOffer(rawUrl, env) {
   const raw = extractFromHtml(html);
   // id do produto: prioriza a URL final (resolvida do meli.la), cai pro HTML.
   const mlId = mlIdFromUrl(finalUrl) || mlIdFromUrl(html);
+  // URL de produto p/ gerar o nosso link de afiliado. O finalUrl pode ser a página
+  // /social do afiliado-fonte (Promotop), então montamos do mlId — o linkbuilder do
+  // ML aceita /p/MLB... (validado).
+  const productUrl = mlId ? `https://www.mercadolivre.com.br/p/${mlId}` : finalUrl || url;
 
   const enriched = await enrichWithGemini(raw, url, env);
 
   const merged = {
     mlId,
+    productUrl,
     title: enriched.title || raw.title || "",
     description: enriched.description || raw.description || "",
     seoTitle: enriched.seoTitle || "",
