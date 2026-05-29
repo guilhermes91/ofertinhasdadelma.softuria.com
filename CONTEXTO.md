@@ -116,9 +116,19 @@ Mudança trivial (1 linha de CSS, texto) pula a cerimônia.
 
 ## 5. Estado atual (2026-05-28)
 
-- `main` limpa. Site no ar. SSR + admin + captação funcionando.
-- Últimos commits: limitar "Em alta"/Categorias ao top 5; ajustes de espaçamento da tagstrip.
-- `tagCounts(...).slice(0,5)` no header; paginação 12/página.
+- `main` no ar. SSR + admin + captação funcionando. Auto-deploy a cada push.
+- **WS1 ✅ de-geo nacional** (`SITE.region`, default Brasil) — commit `51791c9`.
+- **WS3 ✅ bot** (Promotop → ML, cron desarmado, harness validou 10/10) — commit `03aa110`.
+- **WS2 ✅ SEO on-page** (Organization/FAQPage/Product schema, sitemap c/ imagens, relacionadas
+  por tag, FAQ) — commit `a38033c`. Redesign visual fino **pendente** (precisa dos olhos do dono).
+- Plano off-site + TODOs + como armar o bot: **`docs/SEO-PLAYBOOK.md`**.
+
+### Próximos passos (com o dono)
+1. **Validar o bot juntos** e decidir monetização (link de afiliado nosso) → armar cron.
+2. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
+3. **Search Console + GA4** — medir e indexar. Ver playbook §2.
+4. **Redesign visual** do que ficou "confuso" — rodada com prints.
+5. **Backlink/Digital PR** — execução humana. Ver playbook §4.
 
 ---
 
