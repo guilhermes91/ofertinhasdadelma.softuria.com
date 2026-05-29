@@ -78,11 +78,62 @@ export function ensureOffer(offer) {
     priceOld: priceOld || null,
     discount: discount || null,
     link: stringOrEmpty(o.link),
+    mlId: stringOrEmpty(o.mlId),
     tags,
     bestseller: !!o.bestseller,
     isNew: o.isNew !== false,
     seller: stringOrEmpty(o.seller) || "Mercado Livre"
   };
+}
+
+// Normaliza link pra comparação: tira query/hash/barra final e caixa.
+export function normalizeLink(l) {
+  return String(l || "").trim().replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+}
+
+// Extrai o id do produto no Mercado Livre (MLB...) de uma URL ou HTML.
+// Pega tanto item (MLB-1234567890) quanto catálogo (/p/MLB12345).
+export function mlIdFromUrl(value) {
+  const m = String(value || "").toUpperCase().match(/MLB-?(\d{6,})/);
+  return m ? "MLB" + m[1] : "";
+}
+
+// Acha oferta duplicada: 1º pelo id do produto (robusto a link rotacionado),
+// depois pelo link normalizado (fallback p/ ofertas antigas sem mlId).
+export function findDuplicateIndex(offers, incoming) {
+  const id = incoming.mlId;
+  const link = normalizeLink(incoming.link);
+  return offers.findIndex(
+    (o) => (id && o.mlId && o.mlId === id) || (link && normalizeLink(o.link) === link)
+  );
+}
+
+// Insere ou atualiza ("repost"). Se já existe o mesmo produto, atualiza no lugar
+// — MANTÉM id/slug pra não quebrar URL/SEO — e (por padrão) joga pro topo com
+// addedAt novo. Retorna { offers, action: added|refreshed|skipped, offer }.
+export function upsertOffer(offers, incoming, opts = {}) {
+  const { bumpToTop = true, onlyIfChanged = false } = opts;
+  const idx = findDuplicateIndex(offers, incoming);
+  if (idx === -1) {
+    return { offers: [incoming, ...offers], action: "added", offer: incoming };
+  }
+  const existing = offers[idx];
+  const priceChanged = Number(existing.priceCurrent || 0) !== Number(incoming.priceCurrent || 0);
+  if (onlyIfChanged && !priceChanged) {
+    return { offers, action: "skipped", offer: existing };
+  }
+  const refreshed = ensureOffer({
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    slug: existing.slug,
+    addedAt: bumpToTop ? new Date().toISOString() : existing.addedAt
+  });
+  const rest = offers.slice(0, idx).concat(offers.slice(idx + 1));
+  const nextOffers = bumpToTop
+    ? [refreshed, ...rest]
+    : offers.slice(0, idx).concat([refreshed], offers.slice(idx + 1));
+  return { offers: nextOffers, action: "refreshed", offer: refreshed };
 }
 
 function numberOrNull(v) {

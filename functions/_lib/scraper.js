@@ -1,7 +1,7 @@
 // Scraping pipeline: fetch the Mercado Livre URL, extract structured data, then
 // ask Gemini 2.5 Flash to enrich it (description + tags + SEO copy).
 
-import { slugify } from "./data.js";
+import { slugify, mlIdFromUrl } from "./data.js";
 import { SITE } from "./render.js";
 
 const ML_HOSTS = [/(?:^|\.)meli\.la$/i, /(?:^|\.)mercadolivre\.com\.br$/i, /(?:^|\.)mercadolivre\.com$/i];
@@ -14,12 +14,15 @@ export async function scrapeOffer(rawUrl, env) {
     throw new Error("Use um link do Mercado Livre (meli.la, mercadolivre.com.br).");
   }
 
-  const html = await fetchHtml(url);
+  const { html, finalUrl } = await fetchHtml(url);
   const raw = extractFromHtml(html);
+  // id do produto: prioriza a URL final (resolvida do meli.la), cai pro HTML.
+  const mlId = mlIdFromUrl(finalUrl) || mlIdFromUrl(html);
 
   const enriched = await enrichWithGemini(raw, url, env);
 
   const merged = {
+    mlId,
     title: enriched.title || raw.title || "",
     description: enriched.description || raw.description || "",
     seoTitle: enriched.seoTitle || "",
@@ -58,7 +61,7 @@ async function fetchHtml(url) {
     }
   });
   if (!res.ok) throw new Error(`Não consegui abrir o link (HTTP ${res.status}).`);
-  return res.text();
+  return { html: await res.text(), finalUrl: res.url || "" };
 }
 
 function extractFromHtml(html) {

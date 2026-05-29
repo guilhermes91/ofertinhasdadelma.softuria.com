@@ -7,6 +7,7 @@ import {
   loadOffers,
   saveOffers,
   ensureOffer,
+  upsertOffer,
   slugify,
   uniqueSlug,
   isMercadoLivreUrl,
@@ -76,8 +77,9 @@ async function handle(context, method) {
     const all = await loadOffers(env);
     const baseSlug = slugify(scraped.title || "oferta");
     const slug = uniqueSlug(baseSlug, all.map((o) => o.slug));
-    const offer = ensureOffer({ ...scraped, slug, link: target });
-    const next = [offer, ...all];
+    const candidate = ensureOffer({ ...scraped, slug, link: target });
+    // repost: se o produto já existe, atualiza no lugar e sobe pro topo.
+    const { offers: next, offer } = upsertOffer(all, candidate, { bumpToTop: true });
     await saveOffers(env, next);
     await env.OFFERS_KV.put(rateKey, String(Date.now()), { expirationTtl: 600 });
     return htmlResponse(renderSuccess(offer), { status: 200, cacheControl: "no-store" });

@@ -10,6 +10,8 @@ import {
   loadOffers,
   saveOffers,
   ensureOffer,
+  upsertOffer,
+  normalizeLink,
   slugify,
   uniqueSlug
 } from "../_lib/data.js";
@@ -69,6 +71,7 @@ async function run(context) {
     .slice(0, max);
 
   const added = [];
+  const refreshed = [];
   const errors = [];
   let offers = all;
 
@@ -83,15 +86,19 @@ async function run(context) {
         slugify(scraped.title || "oferta"),
         offers.map((o) => o.slug)
       );
-      const offer = ensureOffer({ ...scraped, slug, link, seller: "Mercado Livre" });
-      offers = [offer, ...offers];
-      added.push({ slug: offer.slug, title: offer.title, price: offer.priceCurrent });
+      const candidate = ensureOffer({ ...scraped, slug, link, seller: "Mercado Livre" });
+      // dedup por id do produto; só refresca (e sobe) se o preço mudou — sem churn.
+      const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
+      offers = r.offers;
+      const info = { slug: r.offer.slug, title: r.offer.title, price: r.offer.priceCurrent };
+      if (r.action === "added") added.push(info);
+      else if (r.action === "refreshed") refreshed.push(info);
     } catch (err) {
       errors.push({ link, reason: err.message || "falha no scrape" });
     }
   }
 
-  if (!dry && added.length) {
+  if (!dry && (added.length || refreshed.length)) {
     await saveOffers(env, offers);
   }
 
@@ -101,17 +108,10 @@ async function run(context) {
     candidates: candidates.length,
     fresh: fresh.length,
     added: added.length,
+    refreshed: refreshed.length,
     dry,
     items: added,
+    refreshedItems: refreshed,
     errors
   });
-}
-
-// Dedup tolerante: ignora query/hash/barra final e caixa.
-function normalizeLink(l) {
-  return String(l || "")
-    .trim()
-    .replace(/[?#].*$/, "")
-    .replace(/\/+$/, "")
-    .toLowerCase();
 }
