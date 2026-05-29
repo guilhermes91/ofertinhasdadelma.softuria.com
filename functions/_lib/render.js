@@ -162,6 +162,9 @@ export function header(searchQuery = "", topTags = []) {
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M11 19a8 8 0 1 1 5.3-14.05A8 8 0 0 1 11 19zm10 2-4.3-4.3"/></svg>
           </button>
         </form>
+        <a class="header__publish" href="/captar">
+          <span aria-hidden="true">+</span> <span class="header__publish-txt">Publicar oferta</span>
+        </a>
       </div>
       ${
         tagsHtml

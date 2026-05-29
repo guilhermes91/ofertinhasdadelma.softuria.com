@@ -100,6 +100,19 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .search__btn:hover { background: var(--primary); }
 .search__btn--active { background: var(--primary); }
 
+/* Publicar oferta (CTA da comunidade) */
+.header__publish {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--primary); color: #fff;
+  padding: 10px 16px; border-radius: var(--radius-pill);
+  font-weight: 700; font-size: .92rem; white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(230,74,110,.26);
+  transition: background var(--transition), transform var(--transition);
+}
+.header__publish:hover { background: var(--primary-strong); color: #fff; transform: translateY(-1px); }
+.header__publish span[aria-hidden] { font-size: 1.1rem; line-height: 1; }
+@media (max-width: 720px) { .header__publish-txt { display: none; } .header__publish { padding: 10px 13px; } }
+
 /* Tag strip under header */
 .tagstrip {
   display: flex; align-items: center;
@@ -566,19 +579,32 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   .about__inner { grid-template-columns: 1fr; gap: 28px; }
 }
 @media (max-width: 640px) {
-  .container { padding: 0 18px; }
-  .header__inner { padding: 12px 18px; gap: 12px; }
+  .container { padding: 0 14px; }
+  .header__inner { padding: 12px 14px; gap: 10px; }
   .site-nav { display: none; }
   .brand__tag { display: none; }
-  .hero { padding: 44px 0 32px; }
-  .hero__sub { font-size: 1rem; }
-  .hero__stats { gap: 18px; }
-  .offers { padding: 36px 0 48px; }
-  .offers__grid { grid-template-columns: 1fr; gap: 18px; }
+  .hero { padding: 24px 0 16px; }
+  .hero__sub { font-size: .98rem; }
+  .offers { padding: 28px 0 44px; }
+  /* 2 por linha também no celular (estilo Pechinchou) */
+  .offers__grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .offer-card { padding: 8px; border-radius: var(--radius-md); }
+  .offer-card__body { padding: 12px 2px 2px; }
+  .offer-card__media img { padding: 10px; }
+  .offer-card__price-current { font-size: 1.25rem; }
+  .offer-card__actions { flex-direction: column; gap: 6px; }
+  .offer-card__detail { text-align: center; }
+  .offer-card__chips { display: none; } /* economiza espaço no card estreito */
+  .offer-card__tag { display: none; } /* evita sobreposição com o badge de % no card estreito */
+  .offer-card__badge { padding: 5px 9px; font-size: .7rem; top: 8px; left: 8px; }
   .trust__grid { grid-template-columns: 1fr; }
   .about { padding: 40px 0; }
   .about__card { padding: 20px; }
   .site-footer__inner { justify-content: center; text-align: center; }
+}
+@media (max-width: 380px) {
+  .offers__grid { gap: 8px; }
+  .offer-card__cta { padding: 10px 10px; font-size: .88rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
