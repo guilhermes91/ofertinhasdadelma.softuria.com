@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
   const itemListLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `Ofertas em ${label} — Guarujá-SP`,
+    name: `Ofertas em ${label}`,
     itemListOrder: "https://schema.org/ItemListOrderDescending",
     itemListElement: view.items.map((o, idx) => ({
       "@type": "ListItem",
@@ -48,10 +48,10 @@ export async function onRequestGet(context) {
     <section class="hero hero--compact">
       <div class="container hero__inner">
         <p class="hero__eyebrow"><span class="dot" aria-hidden="true"></span> Categoria</p>
-        <h1 class="hero__title">${escapeHtml(label)} <span class="hl">em Guarujá-SP</span></h1>
+        <h1 class="hero__title">${escapeHtml(label)} <span class="hl">em oferta</span></h1>
         <p class="hero__sub">
           ${filtered.length} ${filtered.length === 1 ? "achadinho" : "achadinhos"} de
-          <strong>${escapeHtml(label.toLowerCase())}</strong> selecionados pra Guarujá-SP, Vicente de Carvalho e região.
+          <strong>${escapeHtml(label.toLowerCase())}</strong> selecionados a dedo no Mercado Livre.
           Preço bom, link direto, sem enrolação.
         </p>
         <nav class="breadcrumb" aria-label="Trilha de navegação">
@@ -71,8 +71,8 @@ export async function onRequestGet(context) {
     </section>
   `;
 
-  const title = `${label} em Guarujá-SP — ofertas selecionadas | ${SITE.name}`;
-  const description = `Achadinhos de ${label.toLowerCase()} com entrega para Guarujá-SP e região. Curado pela Delma, com link direto pro Mercado Livre.`;
+  const title = `${label} em oferta — achadinhos selecionados | ${SITE.name}`;
+  const description = `Achadinhos de ${label.toLowerCase()} com preço bom e link direto pro Mercado Livre. Curado pela Delma.`;
 
   return htmlResponse(
     layout({

@@ -1,6 +1,6 @@
 # Ofertinhas da Delma
 
-Site de achadinhos curados, com SEO local para Guarujá-SP. Vitrine pública + admin com geração automática de copy/tags via Gemini 2.5 Flash + URL pública de captação.
+Site de achadinhos curados do Mercado Livre, com alcance nacional. Vitrine pública + admin com geração automática de copy/tags via Gemini 2.5 Flash + URL pública de captação.
 
 - Produção: <https://ofertinhasdadelma.softuria.com>
 - Admin: <https://ofertinhasdadelma.softuria.com/admin/> (Basic Auth)

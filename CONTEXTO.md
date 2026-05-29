@@ -122,38 +122,40 @@ Mudança trivial (1 linha de CSS, texto) pula a cerimônia.
 
 ---
 
-## 6. Decisões em aberto / em andamento
+## 6. Decisões tomadas / em andamento
 
-### 6.1 Tirar o foco excessivo de Guarujá-SP  *(pedido em 2026-05-28 — aguardando direção)*
+### 6.1 De-geo → nacional  ✅ FEITO (2026-05-28)
 
-O foco em Guarujá está cravado em ~16 pontos. **Mapa exato:**
+**Decisão (dono):** site geo-neutro/nacional. A geo de Guarujá saiu de ~16 pontos e foi
+**centralizada numa única config** — `SITE.region` em `functions/_lib/render.js`
+(default `"todo o Brasil"`). **Trocar esse 1 campo por uma cidade/UF (ex.: `"Guarujá-SP"`)
+reativa a copy/SEO em modo local** sem tocar em mais nenhum arquivo. O prompt do Gemini
+(`scraper.js`) agora lê `SITE.region` e **não obriga mais cidade nenhuma** — a amarra que
+prendia toda oferta nova a "Guarujá" foi removida.
 
-| Arquivo | Onde |
-|---------|------|
-| `functions/_lib/render.js` | `SITE.city = "Guarujá-SP"` + `SITE.description` |
-| `functions/index.js` | title, meta description, `<h1>` hero, `<h2>` "Uma vizinha de Guarujá..." |
-| `functions/oferta/[slug].js` | seoTitle/desc fallback, `areaServed` (schema City Guarujá), lista de bairros, "Mais ofertinhas pra Guarujá" |
-| `functions/tag/[slug].js` | name, `<h1>`, sub, title, description |
-| `functions/_lib/scraper.js` | **prompt do Gemini OBRIGA "Guarujá" no seoTitle/seoDescription** — toda oferta nova nasce amarrada |
-| `functions/api/seed.js` | seoTitle/description dos itens-semente |
-| `admin/index.html` | textos de ajuda |
-| `README.md` | descrição |
+Arquivos tocados: `render.js` (config + description), `scraper.js` (prompt + fallback),
+`index.js` (title/meta/hero/about), `oferta/[slug].js` (seo fallback + `areaServed`→Country BR
++ bullets), `tag/[slug].js`, `api/seed.js`, `admin/index.html`, `README.md`.
 
-**Débito técnico real:** muitos textos estão hardcoded inline, **sem usar** `SITE.city`. O passo
-robusto (independente do destino) é **centralizar a geo numa única config** e fazer todo SSR +
-o prompt do Gemini lerem dela.
+**Residual conhecido (devil):** ofertas **já gravadas no KV** mantêm `seoTitle/seoDescription`
+com "Guarujá" — isso é dado, não código. Só some quando forem re-scrapeadas/editadas. Páginas
+locais (`/guaruja`, etc.) ficam como porta aberta, **não construída** (seria over-engineering agora).
 
-**Tensão (devil SEO Local):** Guarujá não é defeito, é o *moat* — SEO local = baixa concorrência,
-dá pra cravar #1. Ir "nacional" = competir com Magalu/afiliados/ML e virar invisível. Ampliar
-deve ser decisão consciente.
+### 6.2 Redesign + SEO on-page  *(em andamento — WS2)*
+Alvo: cards/badges no estilo Promotop (o que o dono curtiu) + otimização de imagem estilo
+Canaltech + hierarquia/seções pra matar o "confuso" + engenharia SEO (schema, sitemap,
+performance/CLS, internal linking). Referências avaliadas: Promotop (WordPress, visual forte mas
+fraco técnico), Canaltech (Next.js, padrão-ouro de engenharia), Pelando (Astro, mas modelo de
+comunidade — não é o nosso).
 
-**Direções possíveis (a escolher):**
-- **Regional — Baixada Santista:** amplia Guarujá → região (Santos, S. Vicente, Praia Grande...). Mantém moat local, raio maior. *(recomendação do par SEO)*
-- **Nacional — Brasil todo:** remove geo. Máximo alcance, perde moat.
-- **Configurável / sem cidade fixa:** geo vira 1 variável de config, neutra por padrão; clonável p/ outras cidades.
-- **Só suavizar textos:** mantém Guarujá, reduz saturação.
-
-> **STATUS:** aguardando o dono escolher a direção antes de codar. (Ver §2: razão antes de ação.)
+### 6.3 Bot de captação automática  *(em andamento — WS3)*
+Decisão (dono): **scrape de portais** (não API oficial por ora), **só Mercado Livre** (Shopee
+depois), **auto-publicar** + manter captação pública por usuário. Cron a cada ~10 min.
+**Fonte MVP confirmada por probe: Promotop** — `promotop.net/loja/mercado-livre` expõe ~31 links
+`meli.la/...` no HTML server-side. Canaltech e Pelando renderizam no cliente (0 links server-side)
+→ fase 2. **Cron entregue DESARMADO** (manual/`workflow_dispatch`) até validação local de ≥10
+ofertas reais capturadas (exigência do dono). Monetização: o link capturado credita o afiliado do
+portal-fonte; trocar pelo nosso link (gerador ML / API futura) é passo separado — ver SEO-PLAYBOOK.
 
 ---
 

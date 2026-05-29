@@ -67,10 +67,10 @@ export async function onRequestGet(context) {
 
   const title = q
     ? `Busca: ${q} — ${SITE.name}`
-    : `${SITE.name} | Achadinhos com preço bom em Guarujá-SP`;
+    : `${SITE.name} | Achadinhos com preço bom no Mercado Livre`;
   const description = q
-    ? `Resultados de busca para "${q}" — achadinhos selecionados com entrega para Guarujá-SP e região.`
-    : "Garimpo diário de ofertas no Mercado Livre, com curadoria e entrega rápida para Guarujá-SP e região. Produto bom, preço justo e link direto.";
+    ? `Resultados de busca para "${q}" — achadinhos selecionados do Mercado Livre, com link direto.`
+    : "Garimpo diário de ofertas no Mercado Livre, com curadoria e link direto. Produto bom, preço justo e entrega pra todo o Brasil.";
 
   const itemListLd = view.items.length
     ? {
@@ -120,7 +120,7 @@ function hero() {
     <section class="hero" aria-labelledby="hero-title">
       <div class="container hero__inner">
         <p class="hero__eyebrow"><span class="dot" aria-hidden="true"></span> Atualizado com carinho, todo dia</p>
-        <h1 id="hero-title" class="hero__title">Achadinhos garimpados <span class="hl">com calma</span> pra Guarujá-SP e região.</h1>
+        <h1 id="hero-title" class="hero__title">Achadinhos garimpados <span class="hl">com calma</span>, com preço que vale o clique.</h1>
         <p class="hero__sub">
           Eu sou a Delma. Vivo de olho nas ofertas boas de verdade — aquelas que valem o clique.
           Aqui você encontra produto bom, preço justo e link direto. Sem enrolação, sem letra miúda.
@@ -159,7 +159,7 @@ function aboutSection() {
       <div class="container about__inner">
         <div class="about__copy">
           <p class="eyebrow">Quem é a Delma</p>
-          <h2 id="about-title">Uma vizinha de Guarujá que entende de preço bom.</h2>
+          <h2 id="about-title">Uma curadora que entende de preço bom.</h2>
           <p>
             Comecei separando dica pra família e pro grupo do prédio. Quando vi, todo mundo pedia
             pra mandar mais. Resolvi juntar tudo num lugar só, organizadinho, com link direto. Aqui

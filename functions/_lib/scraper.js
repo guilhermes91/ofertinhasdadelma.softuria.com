@@ -1,7 +1,8 @@
 // Scraping pipeline: fetch the Mercado Livre URL, extract structured data, then
-// ask Gemini 2.5 Flash to enrich it (description + tags + Guarujá-SP SEO copy).
+// ask Gemini 2.5 Flash to enrich it (description + tags + SEO copy).
 
 import { slugify } from "./data.js";
+import { SITE } from "./render.js";
 
 const ML_HOSTS = [/(?:^|\.)meli\.la$/i, /(?:^|\.)mercadolivre\.com\.br$/i, /(?:^|\.)mercadolivre\.com$/i];
 const USER_AGENT =
@@ -162,7 +163,7 @@ function fallbackEnrichment(raw) {
     description: "Achadinho garimpado com carinho. Preço bom, vendedor confiável e link direto pra você comprar sem dor de cabeça.",
     seoTitle: clamp(raw.title || "Oferta no Mercado Livre", 70),
     seoDescription: clamp(
-      `${raw.title || "Achadinho da Delma"} com preço bom e entrega rápida pra Guarujá e região. Veja antes que acabe.`,
+      `${raw.title || "Achadinho da Delma"} com preço bom e link direto no Mercado Livre. Veja antes que acabe.`,
       160
     ),
     imageAlt: clamp(raw.title, 130),
@@ -176,9 +177,9 @@ function buildPrompt(raw, url) {
       ? `Preço atual: R$ ${raw.priceCurrent.toFixed(2)}${raw.priceOld ? ` (de R$ ${raw.priceOld.toFixed(2)})` : ""}.`
       : "Preço: não identificado.";
   return [
-    "Você é o copywriter da \"Ofertinhas da Delma\", um site de achadinhos curados para moradores de Guarujá-SP e região (Vicente de Carvalho, Enseada, Pitangueiras, Praia da Enseada, Santos).",
+    `Você é o copywriter da "${SITE.name}", um site de achadinhos curados do Mercado Livre com entrega para ${SITE.region}.`,
     "Tom: vizinha simpática, conversa fácil, português brasileiro coloquial, sem exageros, sem clickbait, sem palavras difíceis.",
-    "Foco em conversão e SEO local: cada texto deve mencionar Guarujá-SP de forma natural ao menos uma vez, sem soar forçado.",
+    "Foco em conversão e SEO: use a palavra-chave principal do produto (marca/modelo/categoria) de forma natural no título e na descrição.",
     "Você receberá os dados de uma oferta do Mercado Livre. Devolva apenas um JSON com os campos pedidos.",
     "",
     `URL: ${url}`,
@@ -189,8 +190,8 @@ function buildPrompt(raw, url) {
     "{",
     '  "title": string  // 60-90 chars, claro, mantenha marca/quantidade quando relevantes',
     '  "description": string  // 1-2 frases, máximo 180 chars, foco em benefício e quem usa',
-    '  "seoTitle": string  // até 70 chars, contendo "Guarujá" ou "Guarujá-SP"',
-    '  "seoDescription": string  // até 160 chars, mencionando entrega/Guarujá-SP de forma natural',
+    '  "seoTitle": string  // até 70 chars, com a palavra-chave principal do produto',
+    '  "seoDescription": string  // até 160 chars, foco em benefício + preço bom + Mercado Livre, de forma natural',
     '  "imageAlt": string  // descrição objetiva do produto, sem marketing',
     '  "tags": string[]  // 3 a 5 tags em kebab-case, sem acentos, focadas no produto/categoria/uso (ex: "moda-infantil", "ferramentas", "casa")',
     "}"

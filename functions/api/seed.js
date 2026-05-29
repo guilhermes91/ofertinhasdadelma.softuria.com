@@ -9,9 +9,9 @@ const SEED = [
     title: "10 Calcinhas Infantis de Algodão para Menina",
     description:
       "Kit com 10 peças tradicionais em algodão macio. Custo bom pra repor o guarda-roupa das pequenas sem pesar.",
-    seoTitle: "10 Calcinhas Infantis de Algodão em oferta — Guarujá-SP",
+    seoTitle: "10 Calcinhas Infantis de Algodão em oferta — Mercado Livre",
     seoDescription:
-      "Kit com 10 calcinhas infantis de algodão por preço bom, com entrega rápida pra Guarujá-SP e região.",
+      "Kit com 10 calcinhas infantis de algodão por preço bom no Mercado Livre, com link direto.",
     image:
       "https://http2.mlstatic.com/D_Q_NP_2X_641838-MLB80679685426_112024-V-10-calcinha-infantil-algodo-tradicional-menina-atacado.webp",
     imageAlt: "Kit com 10 calcinhas infantis de algodão coloridas",
@@ -29,9 +29,9 @@ const SEED = [
     title: "Cola de Contato Tekbond Amarela 30g",
     description:
       "Cola de contato versátil pra calçado, couro, borracha e tecido. A bisnaga de bolso quebra galho em casa, na oficina e na correria do dia a dia.",
-    seoTitle: "Cola de Contato Tekbond 30g em oferta — Guarujá-SP",
+    seoTitle: "Cola de Contato Tekbond 30g em oferta — Mercado Livre",
     seoDescription:
-      "Cola Tekbond amarela 30g por preço bom no Mercado Livre, com entrega rápida pra Guarujá-SP. Frete e estoque conferidos.",
+      "Cola Tekbond amarela 30g por preço bom no Mercado Livre, com link direto. Frete e estoque conferidos.",
     image: "https://http2.mlstatic.com/D_Q_NP_2X_660121-MLA100109699395_122025-V.webp",
     imageAlt: "Bisnaga amarela de cola de contato Tekbond para sapateiro",
     priceCurrent: 19.0,

@@ -18,10 +18,10 @@ export async function onRequestGet(context) {
 
   const others = sortByDateDesc(all.filter((o) => o.id !== offer.id)).slice(0, 3);
   const link = safeUrl(offer.link) || "#";
-  const seoTitle = offer.seoTitle || `${offer.title} em Guarujá-SP — ${SITE.name}`;
+  const seoTitle = offer.seoTitle || `${offer.title} em oferta — ${SITE.name}`;
   const seoDescription =
     offer.seoDescription ||
-    `${offer.title} com preço bom e entrega rápida pra Guarujá-SP e região. Veja antes que acabe.`;
+    `${offer.title} com preço bom e link direto no Mercado Livre. Veja antes que acabe.`;
 
   const productLd = {
     "@context": "https://schema.org",
@@ -38,7 +38,7 @@ export async function onRequestGet(context) {
       price: Number(offer.priceCurrent || 0).toFixed(2),
       availability: "https://schema.org/InStock",
       seller: { "@type": "Organization", name: "Mercado Livre" },
-      areaServed: { "@type": "City", name: "Guarujá", addressRegion: "SP", addressCountry: "BR" }
+      areaServed: { "@type": "Country", name: "Brasil" }
     }
   };
 
@@ -102,7 +102,7 @@ export async function onRequestGet(context) {
               : ""
           }
           <ul class="detail__bullets">
-            <li>Entrega para Guarujá-SP, Vicente de Carvalho, Enseada, Pitangueiras e região.</li>
+            <li>Entrega pra todo o Brasil pelo Mercado Livre.</li>
             <li>Curadoria manual da Delma — só publico se eu compraria.</li>
             <li>Compra no Mercado Livre, com proteção da plataforma.</li>
           </ul>
@@ -114,7 +114,7 @@ export async function onRequestGet(context) {
         ? `<section class="offers offers--others">
              <div class="container">
                <header class="section-head">
-                 <h2>Mais ofertinhas pra Guarujá</h2>
+                 <h2>Mais ofertinhas pra você</h2>
                  <p>Achadinhos recentes que talvez você também goste.</p>
                </header>
                <ul class="offers__grid" role="list">${others.map(offerCard).join("")}</ul>

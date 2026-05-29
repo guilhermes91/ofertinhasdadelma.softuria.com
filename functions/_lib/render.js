@@ -4,9 +4,12 @@ export const SITE = {
   name: "Ofertinhas da Delma",
   tagline: "achadinhos com preço bom todo dia",
   origin: "https://ofertinhasdadelma.softuria.com",
-  city: "Guarujá-SP",
+  // Geo único e central. "todo o Brasil" = modo nacional/neutro.
+  // Troque por uma cidade/UF (ex.: "Guarujá-SP") para reativar a copy e o
+  // SEO em modo local sem mexer em mais nenhum arquivo.
+  region: "todo o Brasil",
   description:
-    "Achadinhos do Mercado Livre garimpados com carinho para Guarujá-SP e região. Preço bom, link direto e curadoria diária."
+    "Achadinhos do Mercado Livre garimpados com carinho. Preço bom, link direto e curadoria diária, com entrega pra todo o Brasil."
 };
 
 export function htmlResponse(html, init = {}) {
