@@ -9,6 +9,31 @@ import {
 } from "./_lib/data.js";
 import { layout, offerCard, pagination, htmlResponse, SITE } from "./_lib/render.js";
 
+// Perguntas frequentes — alimentam a seção visível E o schema FAQPage (rich result).
+// Respostas honestas: nada de promessa que a gente não controla.
+const FAQ = [
+  {
+    q: "Como vocês escolhem as ofertas?",
+    a: "A Delma garimpa à mão no Mercado Livre, compara preço com o histórico e só publica o que vale o clique. Nada de encher a vitrine por encher."
+  },
+  {
+    q: "O preço fica garantido?",
+    a: "O preço e a disponibilidade são definidos pela loja no Mercado Livre no momento da compra. A gente mostra o valor que viu ao publicar, mas confira sempre na página do produto antes de finalizar."
+  },
+  {
+    q: "Onde eu finalizo a compra?",
+    a: "Direto no Mercado Livre. Você clica no link, é levado pra plataforma e compra com a proteção que já conhece. A gente não processa pagamento."
+  },
+  {
+    q: "Tem algum custo pra usar o site?",
+    a: "Nenhum. Os links podem ser de afiliado, ou seja, a gente pode ganhar uma comissão da loja — sem custo a mais pra você."
+  },
+  {
+    q: "Pra quais lugares tem entrega?",
+    a: "Pra todo o Brasil. O prazo e o frete dependem do vendedor e do seu CEP, e aparecem na própria página do Mercado Livre."
+  }
+];
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -63,6 +88,7 @@ export async function onRequestGet(context) {
     </section>
     ${aboutSection()}
     ${trustSection()}
+    ${q ? "" : faqSection()}
   `;
 
   const title = q
@@ -102,6 +128,18 @@ export async function onRequestGet(context) {
     publisher: { "@type": "Organization", name: "Softuria", url: "https://softuria.com/" }
   };
 
+  const faqLd = q
+    ? null
+    : {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: FAQ.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a }
+        }))
+      };
+
   return htmlResponse(
     layout({
       title,
@@ -109,7 +147,7 @@ export async function onRequestGet(context) {
       canonical: q ? `/?q=${encodeURIComponent(q)}` : "/",
       body,
       offers: all,
-      jsonLd: [websiteLd, itemListLd],
+      jsonLd: [websiteLd, itemListLd, faqLd],
       searchQuery: q
     })
   );
@@ -195,6 +233,27 @@ function trustSection() {
           <article class="trust__item"><span class="trust__icon" aria-hidden="true">✓</span><h3>Compra no Mercado Livre</h3><p>Você compra direto na plataforma, com a proteção que já conhece.</p></article>
           <article class="trust__item"><span class="trust__icon" aria-hidden="true">♡</span><h3>Sem enrolação</h3><p>Nada de cadastro, pop-up ou caminho indireto. É clicar e ir.</p></article>
         </div>
+      </div>
+    </section>
+  `;
+}
+
+function faqSection() {
+  const items = FAQ.map(
+    (f) => `
+      <details class="faq__item">
+        <summary>${escapeHtml(f.q)}</summary>
+        <p>${escapeHtml(f.a)}</p>
+      </details>`
+  ).join("");
+  return `
+    <section id="faq" class="faq" aria-labelledby="faq-title">
+      <div class="container faq__inner">
+        <header class="section-head">
+          <h2 id="faq-title">Perguntas frequentes</h2>
+          <p>O essencial pra você comprar tranquilo.</p>
+        </header>
+        ${items}
       </div>
     </section>
   `;

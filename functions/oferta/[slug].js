@@ -16,13 +16,20 @@ export async function onRequestGet(context) {
   const offer = all.find((o) => o.slug === slug);
   if (!offer) return notFound("Essa oferta saiu do ar.", all);
 
-  const others = sortByDateDesc(all.filter((o) => o.id !== offer.id)).slice(0, 3);
+  // Relacionadas: prioriza ofertas que compartilham tag (linkagem interna mais
+  // relevante p/ SEO e UX); cai pras mais recentes se não houver.
+  const pool = all.filter((o) => o.id !== offer.id);
+  const sameTag = (offer.tags || []).length
+    ? pool.filter((o) => (o.tags || []).some((t) => offer.tags.includes(t)))
+    : [];
+  const others = sortByDateDesc(sameTag.length ? sameTag : pool).slice(0, 3);
   const link = safeUrl(offer.link) || "#";
   const seoTitle = offer.seoTitle || `${offer.title} em oferta — ${SITE.name}`;
   const seoDescription =
     offer.seoDescription ||
     `${offer.title} com preço bom e link direto no Mercado Livre. Veja antes que acabe.`;
 
+  const priceValidUntil = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
   const productLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -33,9 +40,11 @@ export async function onRequestGet(context) {
     brand: { "@type": "Brand", name: offer.seller || "Mercado Livre" },
     offers: {
       "@type": "Offer",
-      url: offer.link,
+      url: `${SITE.origin}/oferta/${offer.slug}/`,
       priceCurrency: "BRL",
       price: Number(offer.priceCurrent || 0).toFixed(2),
+      priceValidUntil,
+      itemCondition: "https://schema.org/NewCondition",
       availability: "https://schema.org/InStock",
       seller: { "@type": "Organization", name: "Mercado Livre" },
       areaServed: { "@type": "Country", name: "Brasil" }

@@ -68,7 +68,15 @@ export function layout({
   const url = canonical.startsWith("http") ? canonical : `${SITE.origin}${canonical}`;
   const og = ogImage || `${SITE.origin}/og-cover.svg`;
   const tags = tagCounts(offers).slice(0, 5);
-  const ldBlocks = (Array.isArray(jsonLd) ? jsonLd : [jsonLd])
+  const orgLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE.name,
+    url: SITE.origin + "/",
+    logo: SITE.origin + "/logo-mark.svg",
+    description: SITE.description
+  };
+  const ldBlocks = [orgLd, ...(Array.isArray(jsonLd) ? jsonLd : [jsonLd])]
     .filter(Boolean)
     .map((obj) => `<script type="application/ld+json">${JSON.stringify(obj)}</script>`)
     .join("\n");
@@ -102,7 +110,7 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="preconnect" href="https://http2.mlstatic.com" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=20260506b" />
+  <link rel="stylesheet" href="/styles.css?v=20260528a" />
   ${ldBlocks}
 </head>
 <body>
