@@ -11,7 +11,8 @@ export const SITE = {
   description:
     "Achadinhos do Mercado Livre garimpados com carinho. Preço bom, link direto e curadoria diária, com entrega pra todo o Brasil.",
   // Link do grupo/contato no WhatsApp (canal principal). Vazio = barra do topo escondida.
-  whatsapp: ""
+  // TODO: trocar "#placeholder" pelo link real do grupo (ex.: https://chat.whatsapp.com/XXXX).
+  whatsapp: "#placeholder"
 };
 
 export function htmlResponse(html, init = {}) {
