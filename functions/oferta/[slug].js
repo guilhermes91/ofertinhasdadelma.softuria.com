@@ -91,11 +91,6 @@ export async function onRequestGet(context) {
         </div>
         <div class="detail__body">
           <h1 class="detail__title">${escapeHtml(offer.title)}</h1>
-          ${
-            offer.description
-              ? `<p class="detail__desc">${escapeHtml(offer.description)}</p>`
-              : ""
-          }
           <div class="detail__price">
             <span class="detail__price-current">${escapeHtml(brl(offer.priceCurrent || 0))}</span>
             ${oldPrice}
@@ -105,6 +100,11 @@ export async function onRequestGet(context) {
             Aproveitar no Mercado Livre
           </a>
           <p class="detail__legal">Você é redirecionado para o Mercado Livre, onde a compra é finalizada com a proteção da plataforma.</p>
+          ${
+            offer.description
+              ? `<p class="detail__desc">${escapeHtml(offer.description)}</p>`
+              : ""
+          }
           ${
             tagsHtml
               ? `<div class="detail__tags" aria-label="Categorias relacionadas"><span>Categorias:</span>${tagsHtml}</div>`

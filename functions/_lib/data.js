@@ -153,6 +153,20 @@ export function tagCounts(offers) {
     .sort((a, b) => b.count - a.count);
 }
 
+export function timeAgo(iso) {
+  const t = new Date(iso || 0).getTime();
+  if (!Number.isFinite(t) || t <= 0) return "";
+  const diff = Date.now() - t;
+  if (diff < 0) return "agora";
+  const h = Math.floor(diff / 3600000);
+  if (h < 1) return "agora";
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `há ${d}d`;
+  const m = Math.floor(d / 30);
+  return `há ${m} ${m === 1 ? "mês" : "meses"}`;
+}
+
 export function humanizeTag(slug) {
   if (!slug) return "";
   return slug

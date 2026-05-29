@@ -72,7 +72,6 @@ export async function onRequestGet(context) {
 
   const body = `
     ${heroBlock}
-    ${tagsBlock}
     <section id="ofertas" class="offers" aria-labelledby="offers-title">
       <div class="container">
         <header class="section-head">
@@ -86,6 +85,7 @@ export async function onRequestGet(context) {
         ${offersBlock}
       </div>
     </section>
+    ${tagsBlock}
     ${aboutSection()}
     ${trustSection()}
     ${q ? "" : faqSection()}
@@ -158,20 +158,8 @@ function hero() {
     <section class="hero" aria-labelledby="hero-title">
       <div class="container hero__inner">
         <p class="hero__eyebrow"><span class="dot" aria-hidden="true"></span> Atualizado com carinho, todo dia</p>
-        <h1 id="hero-title" class="hero__title">Achadinhos garimpados <span class="hl">com calma</span>, com preço que vale o clique.</h1>
-        <p class="hero__sub">
-          Eu sou a Delma. Vivo de olho nas ofertas boas de verdade — aquelas que valem o clique.
-          Aqui você encontra produto bom, preço justo e link direto. Sem enrolação, sem letra miúda.
-        </p>
-        <div class="hero__cta">
-          <a class="btn btn--primary" href="#ofertas">Ver ofertas do dia</a>
-          <a class="btn btn--ghost" href="#sobre">Como funciona</a>
-        </div>
-        <ul class="hero__stats" aria-label="O que você encontra aqui">
-          <li><strong>100%</strong><span>Curado à mão</span></li>
-          <li><strong>0</strong><span>Letra miúda</span></li>
-          <li><strong>1 clique</strong><span>Pra aproveitar</span></li>
-        </ul>
+        <h1 id="hero-title" class="hero__title">Achadinhos com <span class="hl">preço que vale o clique</span>.</h1>
+        <p class="hero__sub">Garimpo diário no Mercado Livre: produto bom, preço justo e link direto. Sem enrolação.</p>
       </div>
       <div class="hero__bg" aria-hidden="true"></div>
     </section>

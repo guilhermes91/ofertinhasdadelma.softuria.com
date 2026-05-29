@@ -1,4 +1,4 @@
-import { brl, escapeHtml, humanizeTag, safeUrl, tagCounts } from "./data.js";
+import { brl, escapeHtml, humanizeTag, safeUrl, tagCounts, timeAgo } from "./data.js";
 
 export const SITE = {
   name: "Ofertinhas da Delma",
@@ -110,7 +110,7 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="preconnect" href="https://http2.mlstatic.com" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=20260528a" />
+  <link rel="stylesheet" href="/styles.css?v=20260528b" />
   ${ldBlocks}
 </head>
 <body>
@@ -180,6 +180,7 @@ export function footer() {
 export function offerCard(offer) {
   const url = safeUrl(offer.link) || "#";
   const detail = `/oferta/${escapeHtml(offer.slug)}/`;
+  const ago = timeAgo(offer.addedAt);
   const discount =
     offer.discount && offer.discount >= 5
       ? `<span class="offer-card__badge">${offer.discount}% OFF</span>`
@@ -215,22 +216,23 @@ export function offerCard(offer) {
         }
       </a>
       <div class="offer-card__body">
+        <div class="offer-card__meta">
+          <span class="offer-card__seller">${escapeHtml(offer.seller || "Mercado Livre")}</span>
+          ${ago ? `<span class="offer-card__time">${ago}</span>` : ""}
+        </div>
         <h3 class="offer-card__title">
           <a href="${url}" target="_blank" rel="noopener nofollow sponsored">${titleSafe}</a>
         </h3>
-        ${
-          offer.description
-            ? `<p class="offer-card__desc">${escapeHtml(offer.description)}</p>`
-            : ""
-        }
         ${tagsHtml ? `<div class="offer-card__chips" aria-label="Categorias relacionadas">${tagsHtml}</div>` : ""}
-        <div class="offer-card__price">
-          <span class="offer-card__price-current">${escapeHtml(brl(offer.priceCurrent || 0))}</span>
-          ${oldPrice}
-        </div>
-        <div class="offer-card__actions">
-          <a class="offer-card__cta" href="${url}" target="_blank" rel="noopener nofollow sponsored">Pegar a oferta</a>
-          <a class="offer-card__detail" href="${detail}" aria-label="Ver detalhes de ${titleSafe}">Ver detalhes</a>
+        <div class="offer-card__foot">
+          <div class="offer-card__price">
+            <span class="offer-card__price-current">${escapeHtml(brl(offer.priceCurrent || 0))}</span>
+            ${oldPrice}
+          </div>
+          <div class="offer-card__actions">
+            <a class="offer-card__cta" href="${url}" target="_blank" rel="noopener nofollow sponsored">Pegar a oferta</a>
+            <a class="offer-card__detail" href="${detail}" aria-label="Ver detalhes de ${titleSafe}">Ver detalhes</a>
+          </div>
         </div>
       </div>
     </li>
