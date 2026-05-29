@@ -7,4 +7,7 @@ node_modules/
 .vscode/
 .idea/
 .claude/
-tools/shots/
+
+# Fluxo de QA / validação local — NÃO versionado (ver CONTEXTO.md §8 p/ recriar)
+tools/
+scripts/

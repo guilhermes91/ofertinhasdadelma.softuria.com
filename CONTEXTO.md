@@ -172,5 +172,39 @@ portal-fonte; trocar pelo nosso link (gerador ML / API futura) é passo separado
 ## 7. Memória persistente do Claude
 
 Fatos também salvos em `~/.claude/projects/<este-projeto>/memory/`:
-`working-philosophy`, `team-model`, `project-ofertinhas-overview`, `origem-do-projeto`.
-Este `CONTEXTO.md` é a fonte versionada no repo; a memória é o atalho por sessão.
+`working-philosophy`, `team-model`, `project-ofertinhas-overview`, `origem-do-projeto`,
+`estado-e-gotchas`. Este `CONTEXTO.md` é a fonte versionada no repo; a memória é o atalho por sessão.
+
+---
+
+## 8. Fluxo de TESTE / QA / validação local (NÃO versionado)
+
+> Por decisão do dono, todo o scaffolding de teste/QA fica **fora do git** (`tools/` e `scripts/`
+> no `.gitignore`) pra manter o repo limpo e deployável. Os arquivos **continuam na máquina local**
+> (gitignore não apaga). Esta seção existe pra **recriar do zero** numa conversa futura se sumirem.
+
+**O que existe (local, em `tools/` e `scripts/`):**
+- `tools/shoot.mjs` — **Playwright/Chromium**. Renderiza o SSR real com KV mockado (dados
+  "maldosos": título sem espaço, oferta sem imagem, descrição longa, preço enorme), serve em
+  `localhost`, tira print **desktop (1366×900) e mobile (390×844)** de home/oferta e **mede**
+  altura dos cards (alinhamento), posição do 1º card vs dobra e posição do CTA. Saída em `tools/shots/`.
+- `tools/ref.mjs` — screenshota **referências** (Pechinchou, Promotop) desktop+mobile pra analisar
+  arquitetura de informação.
+- `scripts/test-bot.mjs` — valida o **bot**: descoberta (Promotop→ML) + `scrapeOffer` real, meta
+  **≥10 ofertas**, roda **sem `GEMINI_API_KEY`** (usa fallback, não gasta cota).
+- `scripts/smoke-render.mjs` — **smoke SSR**: renderiza home/oferta/tag/sitemap, confere schemas e
+  que **não vaza "Guarujá"**.
+
+**Como recriar / rodar (Node ≥18; aqui v24):**
+```bash
+# 1) Playwright (uma vez)
+cd tools && npm init -y && npm i playwright && npx playwright install chromium && cd ..
+# 2) Rodar
+node tools/shoot.mjs        # prints + métricas de layout (lê os PNGs em tools/shots/)
+node tools/ref.mjs          # prints das referências
+node scripts/test-bot.mjs   # valida captação (>=10 ofertas)
+node scripts/smoke-render.mjs  # smoke SSR
+```
+Os harnesses importam direto de `functions/_lib/*` e das páginas SSR — sem build step.
+O processo de design é: **rodar shoot.mjs → abrir os PNGs → diagnosticar → corrigir CSS/SSR →
+re-rodar → comparar**. Sempre validar visualmente desktop **e** mobile antes de commitar.

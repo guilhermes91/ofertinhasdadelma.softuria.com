@@ -11,3 +11,5 @@ equipe, conceito, projeto, stack, estado atual e decisões em aberto.
 - **Como trabalhar:** pares maker + advogado do diabo; razão vence; simples e robusto com
   propósito (Uno vs. Ferrari); sem alucinação; reportar fielmente. Detalhe em `CONTEXTO.md` §2–3.
 - **Fluxo:** a cada mudança relevante → atualizar `CONTEXTO.md` + commit + push.
+- **Teste/QA:** harnesses de teste ficam em `tools/` e `scripts/` (gitignored, local-only). Como
+  recriar e rodar (Playwright, smoke SSR, validação do bot): `CONTEXTO.md` §8.
