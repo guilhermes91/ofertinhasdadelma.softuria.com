@@ -11,3 +11,8 @@ node_modules/
 # Fluxo de QA / validação local — NÃO versionado (ver CONTEXTO.md §8 p/ recriar)
 tools/
 scripts/
+
+# Credenciais/sessão — NUNCA versionar
+cookies.txt
+*cookies*.txt
+ml_session/
