@@ -124,13 +124,26 @@ function firstMatch(text, regex) {
 
 function decode(value) {
   if (!value) return "";
-  return value
-    .replace(/&amp;/g, "&")
+  return String(value)
+    // entidades numéricas (decimais e hex) primeiro: &#39; &#x27; etc.
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => fromCodePoint(parseInt(n, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    // &amp; por último pra não "des-escapar" duplo (&amp;lt; -> &lt;)
+    .replace(/&amp;/g, "&");
+}
+
+function fromCodePoint(cp) {
+  if (!Number.isFinite(cp) || cp < 0 || cp > 0x10ffff) return "";
+  try {
+    return String.fromCodePoint(cp);
+  } catch {
+    return "";
+  }
 }
 
 // ----- Gemini -----

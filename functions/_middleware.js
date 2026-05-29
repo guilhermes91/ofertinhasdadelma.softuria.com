@@ -11,10 +11,12 @@ export async function onRequest(context) {
   const isAdminPage = path.startsWith("/admin");
   const isApi = path.startsWith("/api/");
   const isScrape = path === "/api/scrape";
+  const isBot = path === "/api/bot";
   const isWrite = isApi && !READ_METHODS.has(method);
 
-  // /captar is public on purpose (single-shot capture link).
-  const requiresAuth = isAdminPage || isScrape || isWrite;
+  // /captar e /api/bot são públicos de propósito: o bot tem seu próprio token
+  // (BOT_TOKEN) verificado no handler, então não passa pelo Basic Auth.
+  const requiresAuth = isAdminPage || isScrape || (isWrite && !isBot);
 
   if (requiresAuth && !checkBasicAuth(request, env)) {
     return unauthorized();

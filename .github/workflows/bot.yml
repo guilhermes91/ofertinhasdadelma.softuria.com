@@ -1,0 +1,32 @@
+name: Bot de ofertas (Mercado Livre)
+
+# DESARMADO por padrão: roda só no disparo manual (workflow_dispatch).
+# Para ARMAR o cron de 10 em 10 min, descomente o bloco `schedule` abaixo.
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: "Máximo de ofertas a capturar nesta execução"
+        required: false
+        default: "8"
+  # schedule:
+  #   - cron: "*/10 * * * *"   # a cada 10 minutos — descomente para ARMAR
+
+jobs:
+  capturar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar captação no /api/bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          MAX: ${{ github.event.inputs.max || '8' }}
+        run: |
+          if [ -z "$BOT_TOKEN" ]; then
+            echo "::error::Secret BOT_TOKEN não configurado no repositório."
+            exit 1
+          fi
+          echo "Disparando captação (max=$MAX)..."
+          curl -fsS -X POST "https://ofertinhasdadelma.softuria.com/api/bot?max=$MAX" \
+            -H "Authorization: Bearer $BOT_TOKEN" | tee resposta.json
+          echo ""
+          echo "Concluído."
