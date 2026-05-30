@@ -21,12 +21,23 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           MAX: ${{ github.event.inputs.max || '8' }}
         run: |
+          set -euo pipefail
           if [ -z "$BOT_TOKEN" ]; then
             echo "::error::Secret BOT_TOKEN não configurado no repositório."
             exit 1
           fi
           echo "Disparando captação (max=$MAX)..."
-          curl -fsS -X POST "https://ofertinhasdadelma.softuria.com/api/bot?max=$MAX" \
-            -H "Authorization: Bearer $BOT_TOKEN" | tee resposta.json
+          # UA de browser: o Bot Fight Mode do Cloudflare bloqueia (403) UAs tipo "curl/"
+          # ANTES de chegar na Function. Sem isto o cron roda "verde" mas não capta nada.
+          code=$(curl -sS -w '%{http_code}' -o resposta.json -X POST \
+            "https://ofertinhasdadelma.softuria.com/api/bot?max=$MAX" \
+            -H "Authorization: Bearer $BOT_TOKEN" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+          echo "HTTP $code"
+          cat resposta.json 2>/dev/null || true
           echo ""
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Bot retornou HTTP $code (esperava 2xx). Veja o corpo acima."
+            exit 1
+          fi
           echo "Concluído."
