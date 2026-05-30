@@ -52,6 +52,9 @@ jobs:
                 | select(.link != null) ] }' > updates.json
           U=$(jq '.updates | length' updates.json)
           echo "links gerados: $U de $N"
+          echo "== falhas (sem link na resposta da API) =="
+          jq -r '.[] | select((.short_url==null) and (.affiliate_url==null) and (.long_url==null))
+                 | "\(.url // .original_url // .platform // "?")  ERR=\(.error // .detail // "sem link/erro")"' gen.json || true
 
           echo "== 4) aplicar no site =="
           code=$(curl -sS -w '%{http_code}' -o applied.json -X POST "$SITE/api/relink" \
