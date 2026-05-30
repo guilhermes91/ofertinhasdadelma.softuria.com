@@ -62,8 +62,8 @@ jobs:
               RSID=$(echo "$EP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('result',{}).get('id',''))")
               echo "ruleset custom id = ${RSID:-(vazio, sera criado no PUT)}"
               EXPR="(http.host eq \"$HOST\" and starts_with(http.request.uri.path, \"/api/bot\"))"
-              BODY=$(python3 -c "import json,os;print(json.dumps({'action':'skip','action_parameters':{'ruleset':'current','phases':['http_request_sbfm','http_request_firewall_managed'],'products':['bic','uaBlock','hot','securityLevel','zoneLockdown','rateLimit','waf']},'expression':os.environ['EXPR'],'description':os.environ['RULE_DESC'],'enabled':True}))" )
               export EXPR
+              BODY=$(python3 -c "import json,os;print(json.dumps({'action':'skip','action_parameters':{'products':['bic','uaBlock','hot','securityLevel','rateLimit']},'expression':os.environ['EXPR'],'description':os.environ['RULE_DESC'],'enabled':True}))" )
               if [ -n "$RSID" ]; then
                 curl -sS -X POST -H "$AUTH" -H "$CT" "$B/zones/$ZID/rulesets/$RSID/rules" --data "$BODY" | python3 -c "import sys,json;d=json.load(sys.stdin);print('CRIADA' if d.get('success') else 'ERRO: '+json.dumps(d)[:400])" || true
               else
