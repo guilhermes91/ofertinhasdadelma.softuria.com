@@ -1,14 +1,15 @@
 // Monetização + compliance dos links de afiliado. Token-gated (igual /api/bot).
 //
-// A GERAÇÃO do link é da API externa (gerador-link-afiliados) e roda no GitHub
-// Actions (workflow relink.yml) — o edge não alcança a API (porta 8000 / EC2 sob
-// demanda). Este endpoint só LISTA o que falta e APLICA o que o GHA gerou:
+// A GERAÇÃO roda no GitHub Actions (relink.yml): pega o link da FONTE (sourceUrl, o
+// meli.la) de cada oferta e manda pra API externa, que resolve o produto e devolve o
+// NOSSO link. O edge não alcança a API (porta 8000 / EC2 sob demanda).
 //
-//   GET  /api/relink?list=1     → { candidates: [{ id, slug, mlId, productUrl }] }
-//        (ofertas com mlId cujo link NÃO é um link de afiliado nosso)
-//   POST /api/relink {updates:[{id,link}]} → grava os links gerados. { updated }
-//   POST /api/relink            → varredura de COMPLIANCE: resolve cada link e, se
-//        for de terceiro, troca pela URL de produto LIMPA (não depende da API).
+//   GET  /api/relink?list=1   → { candidates: [{ id, slug, mlId, genUrl }] }
+//        genUrl = sourceUrl (preferido) || produto.mercadolivre.com.br/MLB-<mlId>
+//        (só ofertas cujo link ainda NÃO é nosso)
+//   POST {seed:[{mlId, sourceUrl}]}   → grava sourceUrl em ofertas existentes (backfill)
+//   POST {updates:[{id?|mlId?, link}]} → grava os links gerados (só aceita link nosso)
+//   POST (sem corpo)          → varredura de COMPLIANCE: foreign → URL limpa
 //
 // Uso: Authorization: Bearer <BOT_TOKEN>
 
@@ -27,10 +28,9 @@ export async function onRequestPost(context) {
 }
 
 function productUrlFromId(mlId) {
-  return `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}`;
+  return mlId ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}` : "";
 }
 
-// É um link de afiliado nosso? (meli.la curto que geramos, ou /social/<nossa tag>)
 function isOurAffiliateLink(link, tag) {
   const l = String(link || "").toLowerCase();
   return /(?:^|\/\/)meli\.la\//.test(l) || l.includes("/social/" + tag.toLowerCase());
@@ -69,29 +69,46 @@ async function run(context, method) {
   const tag = env.ML_AFFILIATE_TAG || OUR_TAG_DEFAULT;
   const offers = await loadOffers(env);
 
-  // --- LISTAR candidatos p/ o GHA gerar (sem rede) ---
+  // --- LISTAR candidatos p/ o GHA gerar ---
   if (method === "GET" && url.searchParams.get("list") === "1") {
     const candidates = offers
-      .filter((o) => o.mlId && !isOurAffiliateLink(o.link, tag))
-      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, productUrl: productUrlFromId(o.mlId) }));
+      .filter((o) => !isOurAffiliateLink(o.link, tag))
+      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: o.sourceUrl || productUrlFromId(o.mlId) }))
+      .filter((c) => c.genUrl);
     return jsonResponse({ ok: true, total: offers.length, candidates });
   }
 
-  // --- APLICAR links gerados pelo GHA ---
   let body = null;
   if (method === "POST") {
     try { body = await request.json(); } catch { body = null; }
   }
+
+  // --- SEED de sourceUrl (backfill de ofertas antigas, casa por mlId) ---
+  if (body && Array.isArray(body.seed)) {
+    let seeded = 0;
+    for (const s of body.seed) {
+      const mlId = s && s.mlId ? String(s.mlId).toUpperCase() : "";
+      const src = s && typeof s.sourceUrl === "string" ? s.sourceUrl.trim() : "";
+      if (!mlId || !/^https?:\/\//i.test(src)) continue;
+      for (const o of offers) {
+        if (String(o.mlId).toUpperCase() === mlId && o.sourceUrl !== src) { o.sourceUrl = src; seeded++; }
+      }
+    }
+    if (seeded) await saveOffers(env, offers);
+    return jsonResponse({ ok: true, seeded });
+  }
+
+  // --- APLICAR links gerados (casa por id OU mlId; só aceita link nosso) ---
   if (body && Array.isArray(body.updates)) {
-    const byId = new Map(offers.map((o) => [o.id, o]));
     let updated = 0;
     for (const u of body.updates) {
-      const o = u && u.id ? byId.get(u.id) : null;
       const link = u && typeof u.link === "string" ? u.link.trim() : "";
-      // só aceita link de afiliado nosso (segurança: nunca grava link de terceiro aqui)
-      if (o && isOurAffiliateLink(link, tag) && link !== o.link) {
-        o.link = link;
-        updated++;
+      if (!isOurAffiliateLink(link, tag)) continue;
+      const targets = offers.filter(
+        (o) => (u.id && o.id === u.id) || (u.mlId && String(o.mlId).toUpperCase() === String(u.mlId).toUpperCase())
+      );
+      for (const o of targets) {
+        if (o.link !== link) { o.link = link; updated++; }
       }
     }
     if (updated) await saveOffers(env, offers);
@@ -99,22 +116,18 @@ async function run(context, method) {
   }
 
   // --- VARREDURA DE COMPLIANCE (sem API): foreign → URL limpa ---
-  const max = parseInt(url.searchParams.get("max") || "", 10) || 0;
   const dry = url.searchParams.get("dry") === "1";
   const cleaned = [];
   const skipped = [];
   let safe = 0;
-  let processed = 0;
   for (const o of offers) {
-    if (max && processed >= max) break;
-    processed++;
     const finalUrl = await resolveFinal(o.link);
     if (!isForeign(finalUrl, tag)) { safe++; continue; }
     const mlId = o.mlId || mlIdFromUrl(finalUrl) || mlIdFromUrl(o.link);
-    if (!mlId) { skipped.push({ slug: o.slug, link: o.link }); continue; }
     const clean = productUrlFromId(mlId);
+    if (!clean) { skipped.push({ slug: o.slug, link: o.link }); continue; }
     if (clean !== o.link) { if (!dry) o.link = clean; cleaned.push({ slug: o.slug, from: o.link, to: clean }); }
   }
   if (!dry && cleaned.length) await saveOffers(env, offers);
-  return jsonResponse({ ok: true, mode: "compliance-sweep", dry, total: offers.length, processed, safe, cleaned: cleaned.length, skipped: skipped.length, cleanedItems: cleaned, skippedItems: skipped });
+  return jsonResponse({ ok: true, mode: "compliance-sweep", dry, total: offers.length, safe, cleaned: cleaned.length, skipped: skipped.length, cleanedItems: cleaned, skippedItems: skipped });
 }

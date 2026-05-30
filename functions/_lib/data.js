@@ -84,6 +84,9 @@ export function ensureOffer(offer) {
     discount: discount || null,
     link: stringOrEmpty(o.link),
     mlId: stringOrEmpty(o.mlId),
+    // link da FONTE (meli.la) — INTERNO, nunca exibido. Usado só p/ gerar o nosso
+    // link de afiliado (a API resolve o produto a partir dele, sem id bogus).
+    sourceUrl: stringOrEmpty(o.sourceUrl),
     reports: Math.max(0, parseInt(o.reports, 10) || 0),
     tags,
     bestseller: !!o.bestseller,

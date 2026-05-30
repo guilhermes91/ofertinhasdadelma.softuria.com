@@ -35,6 +35,8 @@ export async function scrapeOffer(rawUrl, env) {
   const merged = {
     mlId,
     productUrl,
+    sourceUrl: rawUrl, // link original (meli.la da fonte / colado) p/ gerar o nosso afiliado
+
     title: enriched.title || raw.title || "",
     description: enriched.description || raw.description || "",
     seoTitle: enriched.seoTitle || "",

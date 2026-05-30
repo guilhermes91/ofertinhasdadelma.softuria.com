@@ -1,18 +1,22 @@
 name: Relink afiliado (via API gerador-link-afiliados)
 
-# Gera os NOSSOS links de afiliado pela API externa (rodando AQUI no runner, que
-# alcança a API — o edge do Cloudflare não alcança a porta 8000). Fluxo:
-#   1) checa /health da API   2) lista candidatos no site (ofertas sem link nosso)
-#   3) gera em lote via /v2/generate/batch   4) grava de volta via POST /api/relink
+# Gera os NOSSOS links pela API externa (no runner, que alcança a porta 8000).
+# Usa o link da FONTE (sourceUrl, o meli.la) de cada oferta — a API resolve o
+# produto certo (sem depender do mlId, que p/ catálogo vinha bogus).
+# Fluxo: [seed opcional] -> /health -> list -> /v2/generate/batch -> apply.
 #
-# Pré-requisito: a instância EC2 da API precisa estar LIGADA.
+# Pré-requisito: instância EC2 da API LIGADA.
 on:
   workflow_dispatch:
     inputs:
       api:
-        description: "Base URL da API gerador-link-afiliados"
+        description: "Base URL da API"
         required: false
         default: "http://56.125.37.155:8000"
+      seed:
+        description: 'Backfill sourceUrl: JSON [{"mlId":"...","sourceUrl":"https://meli.la/..."}]'
+        required: false
+        default: ""
 
 jobs:
   relink:
@@ -20,6 +24,7 @@ jobs:
     env:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       API: ${{ github.event.inputs.api || 'http://56.125.37.155:8000' }}
+      SEED: ${{ github.event.inputs.seed }}
       SITE: https://ofertinhasdadelma.softuria.com
       BUA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     steps:
@@ -28,23 +33,29 @@ jobs:
           set -euo pipefail
           if [ -z "${BOT_TOKEN:-}" ]; then echo "::error::BOT_TOKEN ausente."; exit 1; fi
 
+          if [ -n "${SEED:-}" ]; then
+            echo "== 0) seed de sourceUrl =="
+            echo "{\"seed\": $SEED}" > seed.json
+            curl -fsS -A "$BUA" -H "Authorization: Bearer $BOT_TOKEN" -H "Content-Type: application/json" \
+              -X POST "$SITE/api/relink" -d @seed.json; echo ""
+          fi
+
           echo "== 1) /health da API =="
           if ! curl -fsS --max-time 25 "$API/health"; then
             echo "::error::API não respondeu ($API). A instância EC2 está ligada?"; exit 1
           fi
           echo ""
 
-          echo "== 2) candidatos no site =="
+          echo "== 2) candidatos =="
           curl -fsS -A "$BUA" -H "Authorization: Bearer $BOT_TOKEN" "$SITE/api/relink?list=1" -o cand.json
           N=$(jq '.candidates | length' cand.json)
           echo "candidatos: $N"
           if [ "$N" -eq 0 ]; then echo "Nada a relinkar. Fim."; exit 0; fi
 
-          echo "== 3) gerar em lote via $API/v2/generate/batch =="
-          jq '{urls: [.candidates[].productUrl]}' cand.json > batch_req.json
-          curl -fsS --max-time 180 -X POST "$API/v2/generate/batch" \
+          echo "== 3) gerar em lote (a partir do link da fonte) =="
+          jq '{urls: [.candidates[].genUrl]}' cand.json > batch_req.json
+          curl -fsS --max-time 240 -X POST "$API/v2/generate/batch" \
             -H "Content-Type: application/json" -d @batch_req.json -o gen.json
-          # zip por índice (o batch devolve um item por URL, na mesma ordem)
           jq -n --slurpfile c cand.json --slurpfile g gen.json '
             { updates: [ range(0; ($c[0].candidates | length)) as $i
                 | { id: $c[0].candidates[$i].id,
@@ -52,13 +63,12 @@ jobs:
                 | select(.link != null) ] }' > updates.json
           U=$(jq '.updates | length' updates.json)
           echo "links gerados: $U de $N"
-          echo "== falhas (sem link na resposta da API) =="
+          echo "== falhas (sem link) =="
           jq -r '.[] | select((.short_url==null) and (.affiliate_url==null) and (.long_url==null))
-                 | "\(.url // .original_url // .platform // "?")  ERR=\(.error // .detail // "sem link/erro")"' gen.json || true
+                 | "\(.url // .original_url // "?")  ERR=\(.error // .detail // "?")"' gen.json || true
 
           echo "== 4) aplicar no site =="
           code=$(curl -sS -w '%{http_code}' -o applied.json -X POST "$SITE/api/relink" \
-            -A "$BUA" -H "Authorization: Bearer $BOT_TOKEN" -H "Content-Type: application/json" \
-            -d @updates.json)
+            -A "$BUA" -H "Authorization: Bearer $BOT_TOKEN" -H "Content-Type: application/json" -d @updates.json)
           echo "apply HTTP $code"; cat applied.json; echo ""
           if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then echo "::error::apply HTTP $code"; exit 1; fi
