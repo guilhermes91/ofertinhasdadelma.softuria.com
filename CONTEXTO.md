@@ -179,6 +179,15 @@ Decisão do dono (2026-05-28): copiar o Pechinchou de ponta a ponta + virar comu
 ML (Termos). O modelo seguro é nosso link em tudo + recompensa ao contribuidor via pontos/creator
 payout (fora do trilho ML). Fase 2 (votos/comentários/contas) exige **D1 + login** (KV não basta).
 
+### 6.7 Geração de link delegada à API externa  ✅ FEITO (2026-05-30)
+Decisão do dono: a geração do link de afiliado passa a ser da API **`gerador-link-afiliados`**
+(`http://56.125.37.155:8000`, EC2 sob demanda). O edge **não** chama a API (porta 8000 bloqueada no
+`fetch` do Workers + EC2 pode estar off → travaria); a monetização roda no **GitHub Actions**
+(`relink.yml`): `/health` → `GET /api/relink?list=1` → `POST /v2/generate/batch` → `POST /api/relink
+{updates}`. Edge segue gravando URL limpa (compliant). `affiliate.js` virou cliente fino
+(`/v2/generate`, só ativa no edge se `AFFILIATE_API_URL` setado). **Rodar:** ligar a EC2
+(`i-0f7e171903f5c4398`) → disparar `relink.yml` → desligar. Detalhe na memória `estado-e-gotchas`.
+
 ### 6.6 COMPLIANCE link de afiliado  ✅ FEITO (2026-05-30)
 **Bug crítico:** link salvo era `aff || target`; com a sessão ML caída, `generateAffiliate`
 retornava null e caía pro `target` = `meli.la` da FONTE (Promotop) **com a tag do concorrente**
