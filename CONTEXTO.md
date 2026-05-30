@@ -179,6 +179,16 @@ Decisão do dono (2026-05-28): copiar o Pechinchou de ponta a ponta + virar comu
 ML (Termos). O modelo seguro é nosso link em tudo + recompensa ao contribuidor via pontos/creator
 payout (fora do trilho ML). Fase 2 (votos/comentários/contas) exige **D1 + login** (KV não basta).
 
+### 6.6 COMPLIANCE link de afiliado  ✅ FEITO (2026-05-30)
+**Bug crítico:** link salvo era `aff || target`; com a sessão ML caída, `generateAffiliate`
+retornava null e caía pro `target` = `meli.la` da FONTE (Promotop) **com a tag do concorrente**
+→ creditávamos comissão a ele (proibido). **Fix:** `captar.js`/`bot.js` caem pra **URL de produto
+LIMPA** (`produto.mercadolivre.com.br/MLB-<id>`, sem tag), nunca pro target. Endpoint **`/api/relink`**
+(token-gated; workflow `relink.yml`) varre e corrige o que já estava gravado — rodado: 40 ofertas,
+**19 links de concorrente removidos, 0 sobrando**. **🔴 Sessão ML está caída** (existe no KV mas
+createLink falha) → captação nova fica sem nossa tag até o dono renovar via POST `/api/ml-session`
+e rodar o relink. Detalhe na memória `estado-e-gotchas`.
+
 ### 6.5 Captação pública: aceita link direto E de afiliado  ✅ FEITO (2026-05-30)
 **Problema:** dono colou no `/captar` um link `meli.la` de afiliado → oferta R$ 0,00, sem imagem e
 sem afiliado. **Investigação (fatos):** link de afiliado do ML — tanto de **produto** quanto de
