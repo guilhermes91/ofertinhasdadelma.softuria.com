@@ -9,8 +9,8 @@ on:
         description: "Máximo de ofertas a capturar nesta execução"
         required: false
         default: "8"
-  # schedule:
-  #   - cron: "*/10 * * * *"   # a cada 10 minutos — descomente para ARMAR
+  schedule:
+    - cron: "*/10 * * * *"   # a cada 10 minutos (ARMADO)
 
 jobs:
   capturar:

@@ -33,11 +33,12 @@ async function run(context) {
   const { request, env } = context;
   const url = new URL(request.url);
 
-  // Token gate — fail closed.
-  const expected = env.BOT_TOKEN;
+  // Token gate — fail closed. Aceita env var OU KV (bot:token) — assim dá pra armar
+  // sem mexer nas env vars do Pages (que poderiam apagar outros secrets).
+  const expected = env.BOT_TOKEN || (await env.OFFERS_KV.get("bot:token"));
   if (!expected) {
     return jsonResponse(
-      { error: "BOT_TOKEN não configurado no ambiente do Pages." },
+      { error: "BOT_TOKEN não configurado (nem env nem KV bot:token)." },
       { status: 503 }
     );
   }
