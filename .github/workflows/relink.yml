@@ -1,0 +1,37 @@
+name: Relink ofertas (compliance afiliado)
+
+# Varre o catálogo e garante que nenhuma oferta aponte pra link de afiliado de
+# terceiro (regenera o NOSSO link a partir do mlId). Manual.
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = só simula (não grava)"
+        required: false
+        default: "0"
+      max:
+        description: "máx. de ofertas a processar (0 = todas)"
+        required: false
+        default: "0"
+
+jobs:
+  relink:
+    runs-on: ubuntu-latest
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      DRY: ${{ github.event.inputs.dry || '0' }}
+      MAX: ${{ github.event.inputs.max || '0' }}
+    steps:
+      - name: Disparar /api/relink
+        run: |
+          set -euo pipefail
+          if [ -z "${BOT_TOKEN:-}" ]; then echo "::error::BOT_TOKEN ausente."; exit 1; fi
+          Q="dry=$DRY&max=$MAX"
+          echo "Relink ($Q)..."
+          code=$(curl -sS -w '%{http_code}' -o resp.json -X POST \
+            "https://ofertinhasdadelma.softuria.com/api/relink?$Q" \
+            -H "Authorization: Bearer $BOT_TOKEN" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+          echo "HTTP $code"
+          cat resp.json; echo ""
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then echo "::error::relink HTTP $code"; exit 1; fi

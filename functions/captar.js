@@ -87,12 +87,14 @@ async function handle(context, method) {
         { status: 422, cacheControl: "no-store" }
       );
     }
-    // gera o NOSSO link de afiliado (se configurado); senão mantém o original
-    const aff = await generateAffiliate(scraped.productUrl || target, env);
+    // Gera o NOSSO link de afiliado. ⚠️ COMPLIANCE: o link salvo NUNCA pode ser o
+    // `target` — ele carrega a tag da FONTE (Promotop etc.), creditando comissão ao
+    // concorrente (proibido). Fallback seguro = URL de produto LIMPA, sem tag nenhuma.
+    const aff = await generateAffiliate(scraped.productUrl, env);
     const all = await loadOffers(env);
     const baseSlug = slugify(scraped.title || "oferta");
     const slug = uniqueSlug(baseSlug, all.map((o) => o.slug));
-    const candidate = ensureOffer({ ...scraped, slug, link: aff || target });
+    const candidate = ensureOffer({ ...scraped, slug, link: aff || scraped.productUrl });
     // repost: se o produto já existe, atualiza no lugar e sobe pro topo.
     const { offers: next, offer } = upsertOffer(all, candidate, { bumpToTop: true });
     await saveOffers(env, next);

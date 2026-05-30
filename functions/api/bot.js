@@ -84,6 +84,7 @@ async function run(context) {
   const added = [];
   const refreshed = [];
   const errors = [];
+  const noAffiliate = []; // ofertas que ficaram com URL limpa (sessão ML caída) → relinkar depois
   let offers = all;
 
   for (const link of fresh) {
@@ -97,8 +98,12 @@ async function run(context) {
         slugify(scraped.title || "oferta"),
         offers.map((o) => o.slug)
       );
-      const aff = await generateAffiliate(scraped.productUrl || link, env);
-      const candidate = ensureOffer({ ...scraped, slug, link: aff || link, seller: "Mercado Livre" });
+      // ⚠️ COMPLIANCE: NUNCA salvar `link` (o meli.la da FONTE carrega a tag do
+      // concorrente — Promotop etc. — e creditaria comissão a ele). Só o NOSSO link
+      // de afiliado ou, se a geração falhar, a URL de produto LIMPA (sem tag).
+      const aff = await generateAffiliate(scraped.productUrl, env);
+      if (!aff) noAffiliate.push({ link, mlId: scraped.mlId });
+      const candidate = ensureOffer({ ...scraped, slug, link: aff || scraped.productUrl, seller: "Mercado Livre" });
       // dedup por id do produto; só refresca (e sobe) se o preço mudou — sem churn.
       const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
       offers = r.offers;
@@ -121,9 +126,11 @@ async function run(context) {
     fresh: fresh.length,
     added: added.length,
     refreshed: refreshed.length,
+    noAffiliate: noAffiliate.length,
     dry,
     items: added,
     refreshedItems: refreshed,
+    noAffiliateItems: noAffiliate,
     errors
   });
 }
