@@ -13,6 +13,25 @@
     }
   }
 
+  // Reportar oferta quebrada/esgotada
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest("[data-report]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-report");
+    if (!id || btn.disabled) return;
+    btn.disabled = true;
+    var original = btn.textContent;
+    btn.textContent = "Enviando...";
+    fetch("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { btn.textContent = (j && j.message) || "Obrigado pelo aviso!"; })
+      .catch(function () { btn.textContent = original; btn.disabled = false; });
+  });
+
   // Smooth scroll for hash links
   document.querySelectorAll('a[href^="#"]').forEach(function (a) {
     a.addEventListener("click", function (e) {

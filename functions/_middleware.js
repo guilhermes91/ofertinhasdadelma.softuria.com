@@ -12,11 +12,12 @@ export async function onRequest(context) {
   const isApi = path.startsWith("/api/");
   const isScrape = path === "/api/scrape";
   const isBot = path === "/api/bot";
+  const isReport = path === "/api/report";
   const isWrite = isApi && !READ_METHODS.has(method);
 
-  // /captar e /api/bot são públicos de propósito: o bot tem seu próprio token
-  // (BOT_TOKEN) verificado no handler, então não passa pelo Basic Auth.
-  const requiresAuth = isAdminPage || isScrape || (isWrite && !isBot);
+  // /captar, /api/bot e /api/report são públicos de propósito: bot tem token próprio;
+  // report é rate-limited por IP. /api/expire continua exigindo Basic Auth (admin).
+  const requiresAuth = isAdminPage || isScrape || (isWrite && !isBot && !isReport);
 
   if (requiresAuth && !checkBasicAuth(request, env)) {
     return unauthorized();

@@ -116,7 +116,7 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="preconnect" href="https://http2.mlstatic.com" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=20260528d" />
+  <link rel="stylesheet" href="/styles.css?v=20260530a" />
   ${ldBlocks}
 </head>
 <body>

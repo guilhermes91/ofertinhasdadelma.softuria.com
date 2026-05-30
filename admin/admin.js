@@ -196,5 +196,25 @@
   }
 
   $("#btn-reload").addEventListener("click", loadList);
+
+  var btnExpire = $("#btn-expire");
+  if (btnExpire) {
+    btnExpire.addEventListener("click", function () {
+      if (!confirm("Remover as ofertas marcadas como quebradas (3+ avisos)?")) return;
+      btnExpire.disabled = true;
+      var original = btnExpire.textContent;
+      btnExpire.textContent = "Limpando...";
+      fetch("/api/expire", { method: "POST" })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, data: j }; }); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.data.error || "Falha ao limpar.");
+          showFlash(res.data.removed + " oferta(s) removida(s).", "ok");
+          loadList();
+        })
+        .catch(function (err) { showFlash(err.message, "err"); })
+        .finally(function () { btnExpire.disabled = false; btnExpire.textContent = original; });
+    });
+  }
+
   loadList();
 })();

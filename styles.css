@@ -472,6 +472,17 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .detail__bullets li::before { content: "✓"; position: absolute; left: 0; top: 8px; color: var(--success); font-weight: 800; }
 @media (max-width: 860px) { .detail__grid { grid-template-columns: 1fr; gap: 20px; } .detail__media { aspect-ratio: 4/3; padding: 14px; max-height: 40vh; } }
 
+/* Reportar oferta quebrada (detalhe) */
+.detail__reportline { margin: 16px 0 0; }
+.detail__report {
+  background: none; border: 0; padding: 0;
+  color: var(--muted); font-size: .85rem; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+  transition: color var(--transition);
+}
+.detail__report:hover { color: var(--primary-strong); }
+.detail__report:disabled { cursor: default; text-decoration: none; color: var(--success); }
+
 /* Capture form (/captar) */
 .capture-form { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 12px; }
 .capture-form input { flex: 1; min-width: 240px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius-pill); font: inherit; background: #fff; transition: all 200ms ease; }

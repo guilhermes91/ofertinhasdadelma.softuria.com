@@ -84,6 +84,7 @@ export function ensureOffer(offer) {
     discount: discount || null,
     link: stringOrEmpty(o.link),
     mlId: stringOrEmpty(o.mlId),
+    reports: Math.max(0, parseInt(o.reports, 10) || 0),
     tags,
     bestseller: !!o.bestseller,
     isNew: o.isNew !== false,
@@ -139,6 +140,24 @@ export function upsertOffer(offers, incoming, opts = {}) {
     ? [refreshed, ...rest]
     : offers.slice(0, idx).concat([refreshed], offers.slice(idx + 1));
   return { offers: nextOffers, action: "refreshed", offer: refreshed };
+}
+
+// Remove ofertas "quebradas" (muitos reports) e/ou vencidas (idade). Por padrão só
+// remove as quebradas; a expiração por idade (maxAgeDays) fica desligada até definir.
+export function expireOffers(offers, opts = {}) {
+  const { maxAgeDays = null, minReports = 3 } = opts;
+  const now = Date.now();
+  const kept = [];
+  const removed = [];
+  for (const o of offers) {
+    const reports = o.reports || 0;
+    const ageDays = (now - new Date(o.addedAt || now).getTime()) / 86400000;
+    const isBroken = minReports != null && reports >= minReports;
+    const isOld = maxAgeDays != null && maxAgeDays > 0 && ageDays > maxAgeDays;
+    if (isBroken || isOld) removed.push({ slug: o.slug, title: o.title, reason: isBroken ? "quebrada" : "vencida" });
+    else kept.push(o);
+  }
+  return { kept, removed };
 }
 
 function numberOrNull(v) {

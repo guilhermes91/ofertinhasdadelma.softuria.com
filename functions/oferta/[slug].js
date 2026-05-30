@@ -115,6 +115,9 @@ export async function onRequestGet(context) {
             <li>Curadoria manual da Delma — só publico se eu compraria.</li>
             <li>Compra no Mercado Livre, com proteção da plataforma.</li>
           </ul>
+          <p class="detail__reportline">
+            <button type="button" class="detail__report" data-report="${escapeHtml(offer.id)}">⚠️ Reportar oferta quebrada ou esgotada</button>
+          </p>
         </div>
       </div>
     </section>
