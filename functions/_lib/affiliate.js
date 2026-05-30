@@ -138,10 +138,12 @@ export async function generateAffiliate(productUrl, env) {
       return env.SHOPEE_AFFILIATE_ID ? shopeeAffiliateUrl(productUrl, env.SHOPEE_AFFILIATE_ID) : null;
     }
     if (isMlUrl(productUrl)) {
-      if (!env.ML_AFFILIATE_TAG || !env.OFFERS_KV) return null;
+      if (!env.OFFERS_KV) return null;
       const cookies = await env.OFFERS_KV.get(ML_SESSION_KEY);
-      if (!cookies) return null;
-      const out = await mlAffiliateLink(productUrl, env.ML_AFFILIATE_TAG, cookies);
+      if (!cookies) return null; // sem sessão ML no KV → mantém link original
+      // tag não é secreta (aparece em todo link de afiliado); default + override por env.
+      const tag = env.ML_AFFILIATE_TAG || "sade9179546";
+      const out = await mlAffiliateLink(productUrl, tag, cookies);
       if (out.cookies && out.cookies !== cookies) await env.OFFERS_KV.put(ML_SESSION_KEY, out.cookies);
       return out.link || null;
     }
