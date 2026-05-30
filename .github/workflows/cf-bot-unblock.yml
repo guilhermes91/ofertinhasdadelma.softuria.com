@@ -51,8 +51,8 @@ jobs:
           case "$ACTION" in
             diagnose) echo "== ACTION=diagnose: nada alterado ==";;
             disable-bfm)
-              echo "== disable Bot Fight Mode =="
-              curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":false}' | python3 -m json.tool || true ;;
+              echo "== disable Bot Fight Mode (fight_mode + crawler_protection) =="
+              curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":false,"crawler_protection":"disabled"}' | python3 -c "import sys,json;d=json.load(sys.stdin);print('OK' if d.get('success') else 'ERRO');print(json.dumps(d.get('result',d),indent=2)[:500])" || true ;;
             enable-bfm)
               curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":true}' | python3 -m json.tool || true ;;
             skip-rule)
