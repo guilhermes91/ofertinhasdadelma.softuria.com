@@ -17,7 +17,7 @@ import {
 } from "../_lib/data.js";
 import { jsonResponse } from "../_lib/render.js";
 import { discoverMlOffers } from "../_lib/portals.js";
-import { generateAffiliate, mlKeepalive } from "../_lib/affiliate.js";
+import { generateAffiliate } from "../_lib/affiliate.js";
 
 const DEFAULT_MAX = 8; // teto por execução — protege a cota do Gemini
 const HARD_MAX = 20;
@@ -55,15 +55,6 @@ async function run(context) {
     HARD_MAX
   );
   const dry = url.searchParams.get("dry") === "1";
-
-  // keepalive da sessão de afiliado ML (se houver) pra não expirar
-  try {
-    const sess = await env.OFFERS_KV.get("ml:session");
-    if (sess) {
-      const k = await mlKeepalive(sess);
-      if (k.ok && k.cookies) await env.OFFERS_KV.put("ml:session", k.cookies);
-    }
-  } catch (_) { /* noop */ }
 
   let candidates = [];
   try {

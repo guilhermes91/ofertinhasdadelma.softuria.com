@@ -1,31 +1,41 @@
-// Varredura de COMPLIANCE: garante que NENHUMA oferta no catálogo aponte pra um
-// link de afiliado de terceiro (ex.: meli.la → /social/promotop). Resolve o link
-// de cada oferta; se NÃO for nosso (tag própria) nem uma URL limpa sem tag,
-// regenera o NOSSO link de afiliado a partir do mlId — e, se a geração falhar,
-// troca pela URL de produto LIMPA (jamais mantém o link do concorrente).
+// Monetização + compliance dos links de afiliado. Token-gated (igual /api/bot).
 //
-// Token-gated igual ao /api/bot. Uso: POST/GET /api/relink[?dry=1][&max=N]
-//   Authorization: Bearer <BOT_TOKEN>
+// A GERAÇÃO do link é da API externa (gerador-link-afiliados) e roda no GitHub
+// Actions (workflow relink.yml) — o edge não alcança a API (porta 8000 / EC2 sob
+// demanda). Este endpoint só LISTA o que falta e APLICA o que o GHA gerou:
+//
+//   GET  /api/relink?list=1     → { candidates: [{ id, slug, mlId, productUrl }] }
+//        (ofertas com mlId cujo link NÃO é um link de afiliado nosso)
+//   POST /api/relink {updates:[{id,link}]} → grava os links gerados. { updated }
+//   POST /api/relink            → varredura de COMPLIANCE: resolve cada link e, se
+//        for de terceiro, troca pela URL de produto LIMPA (não depende da API).
+//
+// Uso: Authorization: Bearer <BOT_TOKEN>
 
 import { loadOffers, saveOffers, mlIdFromUrl } from "../_lib/data.js";
 import { jsonResponse } from "../_lib/render.js";
-import { generateAffiliate } from "../_lib/affiliate.js";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+const OUR_TAG_DEFAULT = "sade9179546";
 
-export async function onRequestPost(context) {
-  return run(context);
-}
 export async function onRequestGet(context) {
-  return run(context);
+  return run(context, "GET");
+}
+export async function onRequestPost(context) {
+  return run(context, "POST");
 }
 
 function productUrlFromId(mlId) {
   return `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}`;
 }
 
-// Resolve o link (segue redirects) e devolve a URL final.
+// É um link de afiliado nosso? (meli.la curto que geramos, ou /social/<nossa tag>)
+function isOurAffiliateLink(link, tag) {
+  const l = String(link || "").toLowerCase();
+  return /(?:^|\/\/)meli\.la\//.test(l) || l.includes("/social/" + tag.toLowerCase());
+}
+
 async function resolveFinal(link) {
   try {
     const r = await fetch(link, {
@@ -37,19 +47,14 @@ async function resolveFinal(link) {
     return "";
   }
 }
-
-// É nosso (tag própria) OU uma URL de produto limpa sem tag de ninguém?
-function isSafe(finalUrl, tag) {
+function isForeign(finalUrl, tag) {
   const u = (finalUrl || "").toLowerCase();
   if (!u) return false;
-  const t = tag.toLowerCase();
-  if (u.includes("/social/" + t) || u.includes("matt_word=" + t)) return true; // nosso
-  // URL de produto sem nenhuma tag de afiliado → não credita concorrente (seguro).
-  const hasForeignTag = u.includes("/social/") || u.includes("matt_word=") || u.includes("matt_tool=");
-  return !hasForeignTag;
+  if (u.includes("/social/" + tag.toLowerCase()) || u.includes("matt_word=" + tag.toLowerCase())) return false;
+  return u.includes("/social/") || u.includes("matt_word=") || u.includes("matt_tool=");
 }
 
-async function run(context) {
+async function run(context, method) {
   const { request, env } = context;
   const url = new URL(request.url);
 
@@ -61,50 +66,55 @@ async function run(context) {
     "";
   if (provided !== expected) return jsonResponse({ error: "Token inválido." }, { status: 401 });
 
-  const dry = url.searchParams.get("dry") === "1";
-  const max = parseInt(url.searchParams.get("max") || "", 10) || 0; // 0 = todas
-  const tag = env.ML_AFFILIATE_TAG || "sade9179546";
-
+  const tag = env.ML_AFFILIATE_TAG || OUR_TAG_DEFAULT;
   const offers = await loadOffers(env);
-  const relinked = [];
+
+  // --- LISTAR candidatos p/ o GHA gerar (sem rede) ---
+  if (method === "GET" && url.searchParams.get("list") === "1") {
+    const candidates = offers
+      .filter((o) => o.mlId && !isOurAffiliateLink(o.link, tag))
+      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, productUrl: productUrlFromId(o.mlId) }));
+    return jsonResponse({ ok: true, total: offers.length, candidates });
+  }
+
+  // --- APLICAR links gerados pelo GHA ---
+  let body = null;
+  if (method === "POST") {
+    try { body = await request.json(); } catch { body = null; }
+  }
+  if (body && Array.isArray(body.updates)) {
+    const byId = new Map(offers.map((o) => [o.id, o]));
+    let updated = 0;
+    for (const u of body.updates) {
+      const o = u && u.id ? byId.get(u.id) : null;
+      const link = u && typeof u.link === "string" ? u.link.trim() : "";
+      // só aceita link de afiliado nosso (segurança: nunca grava link de terceiro aqui)
+      if (o && isOurAffiliateLink(link, tag) && link !== o.link) {
+        o.link = link;
+        updated++;
+      }
+    }
+    if (updated) await saveOffers(env, offers);
+    return jsonResponse({ ok: true, updated, received: body.updates.length });
+  }
+
+  // --- VARREDURA DE COMPLIANCE (sem API): foreign → URL limpa ---
+  const max = parseInt(url.searchParams.get("max") || "", 10) || 0;
+  const dry = url.searchParams.get("dry") === "1";
   const cleaned = [];
   const skipped = [];
-  let oursOk = 0;
+  let safe = 0;
   let processed = 0;
-
   for (const o of offers) {
     if (max && processed >= max) break;
     processed++;
-
     const finalUrl = await resolveFinal(o.link);
-    if (isSafe(finalUrl, tag)) { oursOk++; continue; }
-
-    // Link de terceiro detectado → tenta regenerar o NOSSO.
+    if (!isForeign(finalUrl, tag)) { safe++; continue; }
     const mlId = o.mlId || mlIdFromUrl(finalUrl) || mlIdFromUrl(o.link);
-    if (!mlId) { skipped.push({ slug: o.slug, link: o.link, finalUrl, reason: "sem mlId" }); continue; }
-
-    const productUrl = productUrlFromId(mlId);
-    const aff = await generateAffiliate(productUrl, env);
-    const newLink = aff || productUrl; // nosso link OU url limpa — nunca o do concorrente
-    if (newLink && newLink !== o.link) {
-      if (!dry) o.link = newLink;
-      (aff ? relinked : cleaned).push({ slug: o.slug, from: o.link, to: newLink });
-    }
+    if (!mlId) { skipped.push({ slug: o.slug, link: o.link }); continue; }
+    const clean = productUrlFromId(mlId);
+    if (clean !== o.link) { if (!dry) o.link = clean; cleaned.push({ slug: o.slug, from: o.link, to: clean }); }
   }
-
-  if (!dry && (relinked.length || cleaned.length)) await saveOffers(env, offers);
-
-  return jsonResponse({
-    ok: true,
-    dry,
-    total: offers.length,
-    processed,
-    oursOk,
-    relinked: relinked.length,
-    cleaned: cleaned.length,
-    skipped: skipped.length,
-    relinkedItems: relinked,
-    cleanedItems: cleaned,
-    skippedItems: skipped
-  });
+  if (!dry && cleaned.length) await saveOffers(env, offers);
+  return jsonResponse({ ok: true, mode: "compliance-sweep", dry, total: offers.length, processed, safe, cleaned: cleaned.length, skipped: skipped.length, cleanedItems: cleaned, skippedItems: skipped });
 }
