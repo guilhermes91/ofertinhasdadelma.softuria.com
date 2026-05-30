@@ -172,17 +172,20 @@ Decisão do dono (2026-05-28): copiar o Pechinchou de ponta a ponta + virar comu
 ML (Termos). O modelo seguro é nosso link em tudo + recompensa ao contribuidor via pontos/creator
 payout (fora do trilho ML). Fase 2 (votos/comentários/contas) exige **D1 + login** (KV não basta).
 
-### 6.5 Blindagem da captação pública  ✅ FEITO (2026-05-30)
-**Problema:** dono colou no `/captar` um link `meli.la` que resolvia pra **vitrine `/social/<tag>`**
-(não um produto) → oferta criada com preço R$ 0,00, imagem vazia e link sem afiliado (o `/social`
-não tem `MLB` na URL, então `productUrl` saiu torto). O bot nunca sofreu disso porque já tinha
-guarda (`api/bot.js`: pula sem título/preço); o `/captar` público **não tinha nenhuma**.
-**Correção:** (a) `scraper.js` recusa cedo página `/social` (vitrine) e link **sem `mlId`** com
-mensagem clara; (b) `captar.js` espelha a guarda do bot — sem `priceCurrent` **ou** sem `image` →
-422 com erro amigável, não publica. Guard `/social` validado local (determinístico, indep. de IP).
-**Caveat (devil):** o preço/imagem vêm do HTML server-side do ML, que ele **só entrega cheio pros
-IPs do edge Cloudflare** — IP local recebe shell JS (sem preço). Por isso o caminho feliz não é
-reproduzível localmente; a guarda é a mesma já provada pelo bot rodando no edge.
+### 6.5 Captação pública: aceita link direto E de afiliado  ✅ FEITO (2026-05-30)
+**Problema:** dono colou no `/captar` um link `meli.la` de afiliado → oferta R$ 0,00, sem imagem e
+sem afiliado. **Investigação (fatos):** link de afiliado do ML — tanto de **produto** quanto de
+**perfil** — resolve server-side pra `mercadolivre.com.br/social/<tag>?ref=...`. Num link de
+**produto**, o `ref` fixa o item: `og:title`/`og:image` e o **1º `MLB` do HTML** são o produto
+certo, e o preço sai do card em destaque (validado: creatina 49,99 / ar-cond 1899). Num link de
+**perfil**, o destaque rotaciona (daí o R$ 0,00 de um capture antigo + título/imagem trocando).
+**Correção (cirúrgica):** o scraper **aceita os dois tipos** — `mlId = URL final || 1º MLB do HTML`
+(pega o produto fixado pelo `ref`); só recusa link **sem nenhum `MLB`** (sem produto). `captar.js`
+ganhou a guarda que o bot já tinha: sem `priceCurrent` **ou** sem `image` → 422, não publica.
+Afiliado: `generateAffiliate(productUrl)` roda nos dois casos; se a sessão ML cair, cai pro link
+colado (que, sendo de afiliado, já é nosso). **Validado local 4/4** (2 afiliado-produto, 1 perfil,
+1 direto). **Caveat:** PDP `/p/MLB` renderiza preço client-side → fora do edge vem shell sem preço;
+o ML entrega o HTML cheio pros **IPs do edge Cloudflare** (o bot prova isso rodando no edge).
 
 ### 6.3 Bot de captação automática  *(em andamento — WS3)*
 Decisão (dono): **scrape de portais** (não API oficial por ora), **só Mercado Livre** (Shopee
