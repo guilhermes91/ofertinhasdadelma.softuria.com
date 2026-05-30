@@ -12,7 +12,10 @@ export const SITE = {
     "Achadinhos do Mercado Livre garimpados com carinho. Preço bom, link direto e curadoria diária, com entrega pra todo o Brasil.",
   // Link do grupo/contato no WhatsApp (canal principal). Vazio = barra do topo escondida.
   // TODO: trocar "#placeholder" pelo link real do grupo (ex.: https://chat.whatsapp.com/XXXX).
-  whatsapp: "#placeholder"
+  whatsapp: "#placeholder",
+  // Token do Cloudflare Web Analytics (CF Dashboard > Web Analytics > seu site > JS snippet).
+  // Vazio = beacon não renderiza. Determinístico em Pages/SSR (não depende do auto-install).
+  cfBeaconToken: ""
 };
 
 export function htmlResponse(html, init = {}) {
@@ -123,6 +126,11 @@ export function layout({
   <main id="conteudo">${body}</main>
   ${footer()}
   <script src="/client.js" defer></script>
+  ${
+    SITE.cfBeaconToken
+      ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${escapeHtml(SITE.cfBeaconToken)}"}'></script>`
+      : ""
+  }
 </body>
 </html>`;
 }
