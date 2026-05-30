@@ -4,7 +4,7 @@
 > projeto, stack, estado atual e decisões em aberto. Mantido vivo: a cada mudança relevante,
 > atualizar + commit + push.
 >
-> Última atualização: 2026-05-28.
+> Última atualização: 2026-05-30.
 
 ---
 
@@ -171,6 +171,18 @@ Decisão do dono (2026-05-28): copiar o Pechinchou de ponta a ponta + virar comu
 **🔴 Alerta jurídico (registrado):** rotação/cloaking de link de afiliado = **ban permanente** no
 ML (Termos). O modelo seguro é nosso link em tudo + recompensa ao contribuidor via pontos/creator
 payout (fora do trilho ML). Fase 2 (votos/comentários/contas) exige **D1 + login** (KV não basta).
+
+### 6.5 Blindagem da captação pública  ✅ FEITO (2026-05-30)
+**Problema:** dono colou no `/captar` um link `meli.la` que resolvia pra **vitrine `/social/<tag>`**
+(não um produto) → oferta criada com preço R$ 0,00, imagem vazia e link sem afiliado (o `/social`
+não tem `MLB` na URL, então `productUrl` saiu torto). O bot nunca sofreu disso porque já tinha
+guarda (`api/bot.js`: pula sem título/preço); o `/captar` público **não tinha nenhuma**.
+**Correção:** (a) `scraper.js` recusa cedo página `/social` (vitrine) e link **sem `mlId`** com
+mensagem clara; (b) `captar.js` espelha a guarda do bot — sem `priceCurrent` **ou** sem `image` →
+422 com erro amigável, não publica. Guard `/social` validado local (determinístico, indep. de IP).
+**Caveat (devil):** o preço/imagem vêm do HTML server-side do ML, que ele **só entrega cheio pros
+IPs do edge Cloudflare** — IP local recebe shell JS (sem preço). Por isso o caminho feliz não é
+reproduzível localmente; a guarda é a mesma já provada pelo bot rodando no edge.
 
 ### 6.3 Bot de captação automática  *(em andamento — WS3)*
 Decisão (dono): **scrape de portais** (não API oficial por ora), **só Mercado Livre** (Shopee

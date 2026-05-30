@@ -75,6 +75,18 @@ async function handle(context, method) {
 
   try {
     const scraped = await scrapeOffer(target, env);
+    // Guarda de qualidade (espelha o bot em api/bot.js): não publica oferta capada.
+    // Sem preço OU sem imagem = não dá pra mostrar direito na vitrine → recusa cedo.
+    if (scraped.priceCurrent == null || !scraped.image) {
+      return htmlResponse(
+        renderForm({
+          prefilled: target,
+          error:
+            "Consegui abrir o link, mas não li o preço e a imagem do produto. Confira se é a página de um produto do Mercado Livre com preço visível e tente de novo."
+        }),
+        { status: 422, cacheControl: "no-store" }
+      );
+    }
     // gera o NOSSO link de afiliado (se configurado); senão mantém o original
     const aff = await generateAffiliate(scraped.productUrl || target, env);
     const all = await loadOffers(env);

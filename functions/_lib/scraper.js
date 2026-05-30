@@ -15,15 +15,30 @@ export async function scrapeOffer(rawUrl, env) {
   }
 
   const { html, finalUrl } = await fetchHtml(url);
+
+  // Guard: o link precisa apontar pra UM produto. Páginas de VITRINE de afiliado
+  // (/social/<tag>), busca ou categoria têm og:title de "algum" item em destaque
+  // (que rotaciona!) mas não representam um produto — geram oferta sem preço/imagem
+  // confiáveis. Foi exatamente o caso de um /captar que criou oferta R$ 0,00.
+  const finalPath = pathOf(finalUrl) || pathOf(url);
+  if (/^\/social(\/|$)/i.test(finalPath)) {
+    throw new Error(
+      "Esse link é de uma vitrine de afiliado (/social), não de um produto. " +
+        "Abra o produto no Mercado Livre e cole o link dele (botão Compartilhar, ou a URL com /p/MLB...)."
+    );
+  }
+
   const raw = extractFromHtml(html);
   // id do produto: prioriza a URL final (resolvida do meli.la), cai pro HTML.
   const mlId = mlIdFromUrl(finalUrl) || mlIdFromUrl(html);
-  // URL de produto p/ gerar o nosso link de afiliado. O finalUrl pode ser a página
-  // /social do afiliado-fonte (Promotop). Forma ACEITA pelo programa de afiliados
-  // (validado): produto.mercadolivre.com.br/MLB-<id>. (/p/MLB... e /social dão erro 111.)
-  const productUrl = mlId
-    ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}`
-    : finalUrl || url;
+  if (!mlId) {
+    throw new Error(
+      "Não achei o código do produto (MLB...) nesse link. Cole o link de um produto específico do Mercado Livre."
+    );
+  }
+  // URL de produto p/ gerar o nosso link de afiliado. Forma ACEITA pelo programa de
+  // afiliados (validado): produto.mercadolivre.com.br/MLB-<id>. (/p/MLB... e /social dão erro 111.)
+  const productUrl = `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}`;
 
   const enriched = await enrichWithGemini(raw, url, env);
 
@@ -49,6 +64,14 @@ export async function scrapeOffer(rawUrl, env) {
   };
 
   return merged;
+}
+
+function pathOf(u) {
+  try {
+    return new URL(u).pathname;
+  } catch {
+    return "";
+  }
 }
 
 function normalizeUrl(value) {
