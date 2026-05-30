@@ -1,0 +1,79 @@
+name: CF bot unblock (manual)
+
+# Usa o CLOUDFLARE_API_TOKEN (secret) pra diagnosticar/destravar o challenge que
+# bloqueia o /api/bot. NUNCA imprime o token (GHA mascara secrets de qualquer forma).
+# Rodar manualmente: action = diagnose | disable-bfm | skip-rule | enable-bfm | rm-skip-rule
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "diagnose | disable-bfm | skip-rule | enable-bfm | rm-skip-rule"
+        required: false
+        default: "diagnose"
+
+jobs:
+  cf:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      ACTION: ${{ github.event.inputs.action || 'diagnose' }}
+      HOST: ofertinhasdadelma.softuria.com
+      RULE_DESC: "skip-security-api-bot"
+    steps:
+      - name: Run
+        run: |
+          set -uo pipefail
+          if [ -z "${CF_TOKEN:-}" ]; then echo "::error::CLOUDFLARE_API_TOKEN ausente."; exit 1; fi
+          B=https://api.cloudflare.com/client/v4
+          AUTH="Authorization: Bearer $CF_TOKEN"
+          CT="Content-Type: application/json"
+          jq_get() { python3 -c "import sys,json;d=json.load(sys.stdin);print(eval(sys.argv[1]))" "$1" 2>/dev/null; }
+
+          echo "== 1) token verify =="
+          curl -sS -H "$AUTH" "$B/user/tokens/verify" | python3 -m json.tool || true
+
+          echo "== 2) achar a zona (procura softuria) =="
+          ZONES=$(curl -sS -H "$AUTH" "$B/zones?per_page=50")
+          echo "$ZONES" | python3 -c "import sys,json;d=json.load(sys.stdin);[print(z['id'],z['name'],z.get('plan',{}).get('name')) for z in d.get('result',[])] if d.get('success') else print('ERRO zones:',json.dumps(d)[:300])"
+          ZID=$(echo "$ZONES" | python3 -c "import sys,json;d=json.load(sys.stdin);zs=[z for z in d.get('result',[]) if 'softuria' in z['name']];print(zs[0]['id'] if zs else '')")
+          echo "zone id = ${ZID:-(vazio)}"
+          if [ -z "$ZID" ]; then echo "::warning::Token nao enxerga a zona softuria (sem Zone:Read?). Diagnostico parcial."; fi
+
+          if [ -n "$ZID" ]; then
+            echo "== 3) settings que costumam desafiar =="
+            for s in security_level browser_check challenge_ttl; do
+              echo "-- $s --"; curl -sS -H "$AUTH" "$B/zones/$ZID/settings/$s" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['result'] if d.get('success') else 'ERRO: '+json.dumps(d)[:200])" || true
+            done
+            echo "== 3b) Bot Fight Mode (bot_management) =="
+            curl -sS -H "$AUTH" "$B/zones/$ZID/bot_management" | python3 -c "import sys,json;d=json.load(sys.stdin);print(json.dumps(d.get('result',d),indent=2)[:500])" || true
+          fi
+
+          case "$ACTION" in
+            diagnose) echo "== ACTION=diagnose: nada alterado ==";;
+            disable-bfm)
+              echo "== disable Bot Fight Mode =="
+              curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":false}' | python3 -m json.tool || true ;;
+            enable-bfm)
+              curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":true}' | python3 -m json.tool || true ;;
+            skip-rule)
+              echo "== cria WAF custom rule (skip) p/ o /api/bot =="
+              EP=$(curl -sS -H "$AUTH" "$B/zones/$ZID/rulesets/phases/http_request_firewall_custom/entrypoint")
+              echo "$EP" | python3 -c "import sys,json;d=json.load(sys.stdin);print('entrypoint ok' if d.get('success') else 'ERRO: '+json.dumps(d)[:300])"
+              RSID=$(echo "$EP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('result',{}).get('id',''))")
+              echo "ruleset custom id = ${RSID:-(vazio, sera criado no PUT)}"
+              EXPR="(http.host eq \"$HOST\" and starts_with(http.request.uri.path, \"/api/bot\"))"
+              BODY=$(python3 -c "import json,os;print(json.dumps({'action':'skip','action_parameters':{'ruleset':'current','phases':['http_request_sbfm','http_request_firewall_managed'],'products':['bic','uaBlock','hot','securityLevel','zoneLockdown','rateLimit','waf']},'expression':os.environ['EXPR'],'description':os.environ['RULE_DESC'],'enabled':True}))" )
+              export EXPR
+              if [ -n "$RSID" ]; then
+                curl -sS -X POST -H "$AUTH" -H "$CT" "$B/zones/$ZID/rulesets/$RSID/rules" --data "$BODY" | python3 -c "import sys,json;d=json.load(sys.stdin);print('CRIADA' if d.get('success') else 'ERRO: '+json.dumps(d)[:400])" || true
+              else
+                curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/rulesets/phases/http_request_firewall_custom/entrypoint" --data "{\"rules\":[$BODY]}" | python3 -c "import sys,json;d=json.load(sys.stdin);print('CRIADA(entrypoint)' if d.get('success') else 'ERRO: '+json.dumps(d)[:400])" || true
+              fi ;;
+            rm-skip-rule)
+              EP=$(curl -sS -H "$AUTH" "$B/zones/$ZID/rulesets/phases/http_request_firewall_custom/entrypoint")
+              RSID=$(echo "$EP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('result',{}).get('id',''))")
+              RID=$(echo "$EP" | python3 -c "import sys,json,os;rs=json.load(sys.stdin).get('result',{}).get('rules',[]);m=[r for r in rs if r.get('description')==os.environ['RULE_DESC']];print(m[0]['id'] if m else '')")
+              echo "rule a remover = ${RID:-(nenhuma)}"
+              [ -n "$RID" ] && curl -sS -X DELETE -H "$AUTH" "$B/zones/$ZID/rulesets/$RSID/rules/$RID" | python3 -c "import sys,json;d=json.load(sys.stdin);print('REMOVIDA' if d.get('success') else 'ERRO: '+json.dumps(d)[:300])" || echo "nada a remover" ;;
+            *) echo "::error::action desconhecida: $ACTION"; exit 1;;
+          esac
