@@ -167,7 +167,7 @@ justamente aí, nas mudanças de Bot Fight Mode / token / DNS.)*
    Bônus: **42/42 ofertas com nosso link, 0 sem comissão** (catálogo 100% monetizado agora).
 3. ✅ **Tags/badges/cupom (War Room 2026-05-30, §6.9):** badge falso-positivo corrigido, cascata de
    badges, tags híbridas + guard anti-thin, cupom (campo+UI). **No ar.**
-4. ⏸️ **Fonte Promobit** (2–3 saltos, teto baixo) — próxima peça de scrape. **Pelando produto: inviável** (§6.9).
+4. ✅ **Fonte Pelando `/recentes`** integrada e provada (§6.9.1). ⏸️ **Promobit** = próxima peça (multi-hop + cupom digitável).
 5. 🔴 **EC2 on-demand (§6.9):** código do fluxo A+D pronto; **bloqueado por setup do dono** (OIDC
    GitHub→AWS, IAM mínima, fechar porta 8000). Não-negociável: OIDC, não access key (repo público).
 6. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
@@ -342,14 +342,27 @@ melhorar tags, diversificar badges, incluir Promobit+Pelando, destacar cupom, EC
   aplica desconto por **campanha no link** (`coupon_campaign_id`), código digitável é raro → capturamos
   o `campaignId` quando existe; sem inventar código. `priceValidUntil` reduzido 14→3 dias (schema não mente preço).
 
-**⏸️ DECIDIDO mas ADIADO (reportado fielmente):**
-- **Pelando como fonte de PRODUTO: inviável server-side** (feed é Astro/client-side, confirmado por
-  fetch). A única rota server-side é a página de **cupons**, que devolve links de **campanha**
-  (`lista.mercadolivre.com.br/_Container_…`), não produtos → não rende oferta publicável. Fica como
-  possível "feed de cupons" futuro, não como fonte do bot.
-- **Promobit: viável só com 2–3 saltos** (loja → /oferta → interstitial `/Redirect/to` onde o `meli.la`
-  está no HTML), e só ~3/10 ofertas têm o redirect inline. Frágil/caro (Ferrari). Próxima peça focada,
-  com teto baixo de ofertas/execução.
+### 6.9.1 Fontes Pelando + Promobit  (2026-05-30, correção)
+
+O dono reforçou: quando ele manda fonte, é decisão tomada — validar o **fluxo**, não o "se". E
+apontou as URLs certas. **Correção honesta:** na 6.9 dei "Pelando inviável" testando a HOME
+(client-side) — ERRADO. A fonte é **`/recentes`**.
+
+- **✅ PELANDO `/recentes` — INTEGRADO E PROVADO (no ar).** `/recentes` vem renderizado no servidor
+  (RSC): links de saída `dpl.pelando.com.br/r/<JWT>` com a URL de destino em **base64 no payload**.
+  Feed é misto (ML/Shopee/Amazon) → filtramos só ML por ora. O `dpl` redireciona pra
+  `/social/pelando?ref=` (HTML cheio com preço), **igual ao meli.la** → o scraper segue o `dpl`
+  (`REDIRECTOR_HOSTS` em `scraper.js`). **Provado 4/4** ponta a ponta (preço real, mlId, link salvo
+  LIMPO `produto.mercadolivre.com.br/MLB-` = compliant; `sourceUrl`=dpl pro relink). Em `portals.js`
+  `crawlPelando` + entrou no `discoverMlOffers`. Custo: +1 fetch (o feed); resolução do redirect é o
+  mesmo fetch do scrape (sem hop extra).
+- **⏸️ PROMOBIT `/promocoes/loja/mercado-livre/` — viável e RICO em cupom, próxima peça.** O
+  `__NEXT_DATA__` expõe server-side: preço (`offerPrice/offerOldPrice`) e **código de cupom DIGITÁVEL**
+  (`offerCoupon`, `couponCode` ex.: `MELIBELEZA`/`SOHOJE`, com `couponInstructions`/`couponUntil`) —
+  o que o ML cru não dá. Mas o link ML de cada oferta exige salto `/oferta/<slug>` → `/Redirect/to/<id>`
+  (interstitial com o `meli.la` no HTML). Implica **multi-hop + carregar o código do cupom** (muda o
+  contrato de candidato de `string[]` p/ `{url, coupon}`). Fica como peça focada — é onde o campo
+  `coupon.code` (já existente) ganha código de verdade.
 - **EC2 on-demand:** caminho **A+D** — `relink.yml` liga→`wait`→`/health`→relinka→`stop` (`if:always`,
   `concurrency`), disparado pelo `bot.yml` quando `added+refreshed>0`; auto-shutdown interno como
   backstop. **🔴 Exige setup do dono:** OIDC GitHub→AWS (NÃO access key num repo público), IAM mínima

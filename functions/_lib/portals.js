@@ -33,6 +33,48 @@ export const PROMOTOP_SOURCES = [
 export const PECHINCHOU_SOURCES = [
   "https://www.pechinchou.com.br/"
 ];
+// Pelando: a HOME é client-side (0 links no HTML), mas /recentes vem renderizado no
+// servidor (RSC). Os links de saída são `dpl.pelando.com.br/r/<JWT>` com a URL de
+// destino em base64 no payload do token. Feed é MISTO (ML, Shopee, Amazon) → filtramos
+// só os de ML por ora. O dpl redireciona pra /social/pelando?ref= (HTML cheio c/ preço),
+// igual ao meli.la — por isso o scraper segue o dpl (REDIRECTOR_HOSTS). Provado 4/4.
+export const PELANDO_SOURCES = [
+  "https://www.pelando.com.br/recentes"
+];
+
+const PELANDO_DPL_RE = /dpl\.pelando\.com\.br\/r\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/g;
+const ML_DEST_RE = /^https?:\/\/([a-z0-9.-]*\.)?(mercadolivre\.com\.br|meli\.la)\//i;
+
+// Decodifica o destino (campo .url) do payload base64url de um JWT do Pelando.
+function pelandoDest(jwt) {
+  const parts = String(jwt).split(".");
+  if (parts.length < 2) return "";
+  let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  try {
+    const payload = JSON.parse(atob(b64));
+    return payload && typeof payload.url === "string" ? payload.url : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+export async function crawlPelando(fetchImpl = fetch) {
+  const links = new Set();
+  for (const src of PELANDO_SOURCES) {
+    try {
+      const html = await fetchHtml(src, fetchImpl);
+      for (const m of html.matchAll(PELANDO_DPL_RE)) {
+        const dest = pelandoDest(m[1]);
+        // só ML por enquanto; o dpl é o que o scraper segue (resolve /social c/ preço)
+        if (dest && ML_DEST_RE.test(dest)) links.add("https://dpl.pelando.com.br/r/" + m[1]);
+      }
+    } catch (_) {
+      // uma fonte falhar não derruba o resto
+    }
+  }
+  return [...links];
+}
 
 async function fetchHtml(url, fetchImpl) {
   const res = await fetchImpl(url, {
@@ -59,12 +101,13 @@ async function crawl(sources, fetchImpl) {
 export const crawlPromotop = (fetchImpl = fetch) => crawl(PROMOTOP_SOURCES, fetchImpl);
 export const crawlPechinchou = (fetchImpl = fetch) => crawl(PECHINCHOU_SOURCES, fetchImpl);
 
-// Agregador de descoberta: Promotop + Pechinchou (ambos expõem links de ML no
-// HTML server-side). Dedup global por link.
+// Agregador de descoberta: Promotop + Pechinchou (links de ML diretos no HTML) +
+// Pelando /recentes (dpl → /social, só destinos de ML). Dedup global por link.
 export async function discoverMlOffers(fetchImpl = fetch) {
   const groups = await Promise.all([
     crawl(PROMOTOP_SOURCES, fetchImpl),
-    crawl(PECHINCHOU_SOURCES, fetchImpl)
+    crawl(PECHINCHOU_SOURCES, fetchImpl),
+    crawlPelando(fetchImpl)
   ]);
   return [...new Set(groups.flat())];
 }
