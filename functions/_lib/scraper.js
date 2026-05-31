@@ -8,7 +8,7 @@ const ML_HOSTS = [/(?:^|\.)meli\.la$/i, /(?:^|\.)mercadolivre\.com\.br$/i, /(?:^
 // Redirecionadores de afiliado que resolvem pra uma página /social do ML (HTML cheio
 // com preço), igual ao meli.la. Aceitos como ENTRADA; o scraper segue o redirect e o
 // produto final é validado por ser ML (mlId do HTML). Ex.: Pelando (dpl.pelando.com.br).
-const REDIRECTOR_HOSTS = [/(?:^|\.)dpl\.pelando\.com\.br$/i];
+const REDIRECTOR_HOSTS = [/(?:^|\.)dpl\.pelando\.com\.br$/i, /(?:^|\.)bit\.ly$/i];
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 

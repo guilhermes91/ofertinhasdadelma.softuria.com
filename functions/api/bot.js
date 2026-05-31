@@ -24,7 +24,7 @@ const HARD_MAX = 20;
 // teto de fetch+extract (fase 1, sem Gemini) por execução — varremos até `max` novas
 // OU até este teto, o que vier antes. Bound do limite de subrequests do Workers (~50):
 // descoberta (~13) + SCRAPE_BUDGET + Gemini (≤max) fica folgado abaixo de 50.
-const SCRAPE_BUDGET = 12;
+const SCRAPE_BUDGET = 10;
 // títulos que NÃO são de produto (páginas de lista/perfil/recomendações do ML)
 const JUNK_TITLE = /minhas listas|recomenda(ç|c)|listas? de\b|^ofertas\b|^mercado livre$/i;
 
@@ -130,6 +130,15 @@ async function run(context) {
       continue;
     }
     scraped += 1;
+    // Preço da FONTE é autoritativo pro deal (pechinchou/promobit/promotop/pelando têm o
+    // preço curado + cupom). Aplica ANTES do guard — a fonte pode ter preço que o card do
+    // ML não mostra (ex.: link de catálogo /p/ vem sem preço server-side). O ML serve
+    // imagem/mlId/link. Corrige o "preço errado do card /social".
+    if (cand.price != null && Number(cand.price) > 0) {
+      base.raw.priceCurrent = Number(cand.price);
+      base.raw.priceOld = cand.priceOld != null && Number(cand.priceOld) > base.raw.priceCurrent ? Number(cand.priceOld) : base.raw.priceOld;
+      base.raw.discount = null;
+    }
     if (!base.raw.title || base.raw.priceCurrent == null) {
       errors.push({ link, reason: "sem título ou preço" });
       continue;
@@ -140,13 +149,6 @@ async function run(context) {
     if (JUNK_TITLE.test(base.raw.title)) {
       errors.push({ link, reason: "título não-produto (lista/perfil)" });
       continue;
-    }
-    // Preço da FONTE é autoritativo pro deal (pechinchou/promobit têm o preço curado +
-    // cupom). O ML serve imagem/mlId/link. Corrige o "preço errado do card /social".
-    if (cand.price != null && Number(cand.price) > 0) {
-      base.raw.priceCurrent = Number(cand.price);
-      base.raw.priceOld = cand.priceOld != null && Number(cand.priceOld) > base.raw.priceCurrent ? Number(cand.priceOld) : base.raw.priceOld;
-      base.raw.discount = null;
     }
     // dedup por id do produto: já existe e preço igual → pula SEM gastar Gemini.
     const dup = byMlId.get(base.mlId);
