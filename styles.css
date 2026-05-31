@@ -498,6 +498,8 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 
 /* Capture form (/captar) */
 .capture-form { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 12px; }
+.capture-form__row { display: flex; gap: 10px; width: 100%; flex-wrap: wrap; }
+.capture-form__row input { flex: 1; min-width: 160px; }
 .capture-form input { flex: 1; min-width: 240px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius-pill); font: inherit; background: #fff; transition: all 200ms ease; }
 .capture-form input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(230,74,110,.15); }
 .capture-tip { color: var(--muted); font-size: .85rem; }

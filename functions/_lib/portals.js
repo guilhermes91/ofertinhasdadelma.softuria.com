@@ -103,7 +103,7 @@ function promobitOffers(html) {
   if (!arr) return [];
   return arr
     .filter((o) => /mercadolivre/i.test(o.storeDomain || ""))
-    .map((o) => ({ id: o.offerId, coupon: o.offerCoupon || null }))
+    .map((o) => ({ id: o.offerId, coupon: o.offerCoupon || null, price: Number(o.offerPrice) || null, priceOld: Number(o.offerOldPrice) || null }))
     .filter((o) => o.id);
 }
 
@@ -118,11 +118,11 @@ export async function crawlPromobit(fetchImpl = fetch) {
       const intHtml = await fetchHtml("https://www.promobit.com.br/Redirect/to/" + o.id, fetchImpl);
       const m = intHtml.match(PROMOBIT_ML_RE);
       if (!m) continue; // carrega via JS → pula
-      out.push(
-        o.coupon
-          ? { url: m[0], coupon: { code: o.coupon, text: "Cupom Promobit no Mercado Livre", source: "promobit" } }
-          : { url: m[0] }
-      );
+      const item = { url: m[0] };
+      if (o.coupon) item.coupon = { code: String(o.coupon).toUpperCase().slice(0, 24), text: "Cupom Promobit no Mercado Livre", source: "promobit" };
+      if (o.price) item.price = o.price;
+      if (o.priceOld) item.priceOld = o.priceOld;
+      out.push(item);
     } catch (_) {
       // pula esta oferta
     }
@@ -153,7 +153,49 @@ async function crawl(sources, fetchImpl) {
 }
 
 export const crawlPromotop = (fetchImpl = fetch) => crawl(PROMOTOP_SOURCES, fetchImpl);
-export const crawlPechinchou = (fetchImpl = fetch) => crawl(PECHINCHOU_SOURCES, fetchImpl);
+
+// Pechinchou expõe as ofertas no __NEXT_DATA__ da home com PREÇO e CUPOM curados
+// (campo `coupons: []`, ex.: ["MEGACUPOM"]) — bem mais confiável que ler o preço do
+// card /social do ML. Retorna {url, price?, priceOld?, coupon?}. Filtra só ML.
+const PECHINCHOU_ML_RE = /^https?:\/\/(?:www\.)?(?:mercadolivre\.com\.br|meli\.la)\//i;
+
+function pechinchouOffers(html) {
+  const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) return [];
+  let data;
+  try { data = JSON.parse(m[1]); } catch (_) { return []; }
+  let arr = null;
+  (function w(o) {
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o) && o.length && o[0] && typeof o[0] === "object" && ("short_url" in o[0] || "long_url" in o[0])) {
+      if (!arr || o.length > arr.length) arr = o;
+    }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === "object") w(o[k]);
+  })(data);
+  if (!arr) return [];
+  const out = [];
+  for (const o of arr) {
+    const url = o.short_url || o.long_url || "";
+    if (!PECHINCHOU_ML_RE.test(url)) continue; // só ML (pula amazon/linksynergy/etc.)
+    const item = { url };
+    const price = Number(o.price);
+    if (Number.isFinite(price) && price > 0) item.price = price;
+    const old = Number(o.old_price);
+    if (Number.isFinite(old) && old > 0) item.priceOld = old;
+    const code = Array.isArray(o.coupons) && o.coupons[0] ? String(o.coupons[0]).trim() : "";
+    if (code) item.coupon = { code: code.toUpperCase().slice(0, 24), text: "Cupom no Mercado Livre", source: "pechinchou" };
+    out.push(item);
+  }
+  return out;
+}
+
+export async function crawlPechinchou(fetchImpl = fetch) {
+  try {
+    return pechinchouOffers(await fetchHtml(PECHINCHOU_SOURCES[0], fetchImpl));
+  } catch (_) {
+    return [];
+  }
+}
 
 // Agregador de descoberta. Cada fonte devolve string (link) OU {url, coupon}. Normaliza
 // tudo pra {url, coupon?} e dedup por url (preferindo o item que tem cupom).
@@ -162,7 +204,7 @@ export const crawlPechinchou = (fetchImpl = fetch) => crawl(PECHINCHOU_SOURCES, 
 export async function discoverMlOffers(fetchImpl = fetch) {
   const [promotop, pechinchou, pelando, promobit] = await Promise.all([
     crawl(PROMOTOP_SOURCES, fetchImpl),
-    crawl(PECHINCHOU_SOURCES, fetchImpl),
+    crawlPechinchou(fetchImpl),
     crawlPelando(fetchImpl),
     crawlPromobit(fetchImpl)
   ]);
@@ -170,7 +212,15 @@ export async function discoverMlOffers(fetchImpl = fetch) {
   const add = (item) => {
     const o = typeof item === "string" ? { url: item } : item;
     if (!o || !o.url) return;
-    if (!byUrl.has(o.url) || (o.coupon && !byUrl.get(o.url).coupon)) byUrl.set(o.url, o);
+    const prev = byUrl.get(o.url);
+    if (!prev) { byUrl.set(o.url, o); return; }
+    // merge: mantém o que tiver mais dado (cupom/preço da fonte estruturada)
+    byUrl.set(o.url, {
+      url: o.url,
+      coupon: prev.coupon || o.coupon,
+      price: prev.price ?? o.price,
+      priceOld: prev.priceOld ?? o.priceOld
+    });
   };
   [...promotop, ...pechinchou, ...pelando, ...promobit].forEach(add);
   return [...byUrl.values()];

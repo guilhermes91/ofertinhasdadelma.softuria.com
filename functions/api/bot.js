@@ -89,6 +89,29 @@ async function run(context) {
   const refreshed = [];
   const errors = [];
   let offers = all;
+
+  // CORREÇÃO barata (sem scrape): fontes com PREÇO/CUPOM estruturado (pechinchou,
+  // promobit) são autoritativas pro deal. Casa o candidato com a oferta já gravada por
+  // sourceUrl e corrige preço/cupom in-place — sem gastar fetch/Gemini.
+  let corrected = 0;
+  const bySource = new Map();
+  for (const o of all) if (o.sourceUrl) bySource.set(normalizeLink(o.sourceUrl), o);
+  for (const c of candidates) {
+    if (c.price == null) continue;
+    const o = bySource.get(normalizeLink(c.url));
+    if (!o) continue;
+    const newPrice = Number(c.price);
+    if (!(newPrice > 0)) continue;
+    const newOld = c.priceOld != null && Number(c.priceOld) > newPrice ? Number(c.priceOld) : o.priceOld || null;
+    const newCoupon = c.coupon && c.coupon.code ? c.coupon : o.coupon || null;
+    const priceChanged = Number(o.priceCurrent || 0) !== newPrice;
+    const couponChanged = JSON.stringify(o.coupon || null) !== JSON.stringify(newCoupon || null);
+    if (!priceChanged && !couponChanged) continue;
+    const idx = offers.findIndex((x) => x.id === o.id);
+    if (idx === -1) continue;
+    offers[idx] = ensureOffer({ ...o, priceCurrent: newPrice, priceOld: newOld, discount: null, coupon: newCoupon });
+    corrected += 1;
+  }
   let scraped = 0; // teto de fetch+extract por execução (bound de subrequests)
   let hitLimit = false;
 
@@ -118,6 +141,13 @@ async function run(context) {
       errors.push({ link, reason: "título não-produto (lista/perfil)" });
       continue;
     }
+    // Preço da FONTE é autoritativo pro deal (pechinchou/promobit têm o preço curado +
+    // cupom). O ML serve imagem/mlId/link. Corrige o "preço errado do card /social".
+    if (cand.price != null && Number(cand.price) > 0) {
+      base.raw.priceCurrent = Number(cand.price);
+      base.raw.priceOld = cand.priceOld != null && Number(cand.priceOld) > base.raw.priceCurrent ? Number(cand.priceOld) : base.raw.priceOld;
+      base.raw.discount = null;
+    }
     // dedup por id do produto: já existe e preço igual → pula SEM gastar Gemini.
     const dup = byMlId.get(base.mlId);
     if (dup && Number(dup.priceCurrent || 0) === Number(base.raw.priceCurrent || 0)) continue;
@@ -144,7 +174,7 @@ async function run(context) {
     else if (r.action === "refreshed") refreshed.push(info);
   }
 
-  if (!dry && (added.length || refreshed.length)) {
+  if (!dry && (added.length || refreshed.length || corrected)) {
     await saveOffers(env, offers);
   }
 
@@ -154,6 +184,7 @@ async function run(context) {
     candidates: candidates.length,
     scraped,
     hitLimit,
+    corrected,
     added: added.length,
     refreshed: refreshed.length,
     dry,

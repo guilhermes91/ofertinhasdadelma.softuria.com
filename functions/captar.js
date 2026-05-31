@@ -31,11 +31,16 @@ async function handle(context, method) {
   const { request, env } = context;
   const url = new URL(request.url);
   let target = url.searchParams.get("url");
+  // campos manuais (opcionais): se preenchidos, mandam; se vazios, usamos o scrape.
+  let manualCoupon = (url.searchParams.get("coupon") || "").trim();
+  let manualPrice = (url.searchParams.get("price") || "").trim();
 
   if (!target && method === "POST") {
     try {
       const body = await request.formData();
       target = body.get("url");
+      manualCoupon = String(body.get("coupon") || manualCoupon).trim();
+      manualPrice = String(body.get("price") || manualPrice).trim();
     } catch {
       // ignore
     }
@@ -49,6 +54,8 @@ async function handle(context, method) {
     return htmlResponse(
       renderForm({
         prefilled: target,
+        prefilledCoupon: manualCoupon,
+        prefilledPrice: manualPrice,
         error: "O link precisa ser do Mercado Livre (meli.la, mercadolivre.com.br)."
       }),
       { status: 400, cacheControl: "no-store" }
@@ -66,6 +73,8 @@ async function handle(context, method) {
       return htmlResponse(
         renderForm({
           prefilled: target,
+        prefilledCoupon: manualCoupon,
+        prefilledPrice: manualPrice,
           error: `Calma aí! Aguarde ${wait}s antes de mandar outro link.`
         }),
         { status: 429, cacheControl: "no-store" }
@@ -75,12 +84,22 @@ async function handle(context, method) {
 
   try {
     const scraped = await scrapeOffer(target, env);
+    // Override manual (autoritativo): preço e cupom digitados ganham do scrape. Captura
+    // automática de cupom é não-confiável (fontes às vezes expõem a tag da loja, não o
+    // código real) — por isso o manual manda.
+    const mp = parseFloat(manualPrice.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", "."));
+    if (manualPrice && Number.isFinite(mp) && mp > 0) scraped.priceCurrent = mp;
+    if (manualCoupon) {
+      scraped.coupon = { code: manualCoupon.toUpperCase().slice(0, 24), text: "Cupom de desconto", source: "manual" };
+    }
     // Guarda de qualidade (espelha o bot em api/bot.js): não publica oferta capada.
     // Sem preço OU sem imagem = não dá pra mostrar direito na vitrine → recusa cedo.
     if (scraped.priceCurrent == null || !scraped.image) {
       return htmlResponse(
         renderForm({
           prefilled: target,
+        prefilledCoupon: manualCoupon,
+        prefilledPrice: manualPrice,
           error:
             "Consegui abrir o link, mas não li o preço e a imagem do produto. Confira se é a página de um produto do Mercado Livre com preço visível e tente de novo."
         }),
@@ -109,7 +128,7 @@ async function handle(context, method) {
   }
 }
 
-function renderForm({ prefilled = "", message = "", error = "" } = {}) {
+function renderForm({ prefilled = "", prefilledCoupon = "", prefilledPrice = "", message = "", error = "" } = {}) {
   const body = `
     <section class="hero hero--compact">
       <div class="container hero__inner" style="max-width:700px;margin:0 auto;">
@@ -128,9 +147,15 @@ function renderForm({ prefilled = "", message = "", error = "" } = {}) {
           <input id="captar-url" name="url" type="url" inputmode="url" required
                  placeholder="https://meli.la/... ou https://www.mercadolivre.com.br/..."
                  value="${escapeHtml(prefilled)}">
+          <div class="capture-form__row">
+            <input name="price" type="text" inputmode="decimal"
+                   placeholder="Preço (opcional, ex: 129,90)" value="${escapeHtml(prefilledPrice)}">
+            <input name="coupon" type="text" autocapitalize="characters"
+                   placeholder="Cupom (opcional, ex: MEGACUPOM)" value="${escapeHtml(prefilledCoupon)}">
+          </div>
           <button type="submit" class="btn btn--primary">Enviar oferta</button>
         </form>
-        <p class="capture-tip">Dica: copie o link de compartilhamento direto do Mercado Livre. Ele costuma começar com <code>meli.la/</code>.</p>
+        <p class="capture-tip">Dica: cole o link de compartilhamento do Mercado Livre (começa com <code>meli.la/</code>). Preço e cupom são opcionais — se deixar em branco, eu busco sozinha.</p>
       </div>
     </section>
   `;
