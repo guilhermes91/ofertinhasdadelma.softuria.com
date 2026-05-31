@@ -76,6 +76,60 @@ export async function crawlPelando(fetchImpl = fetch) {
   return [...links];
 }
 
+// Promobit: a página da loja expõe as ofertas no __NEXT_DATA__ (preço + CÓDIGO de cupom
+// DIGITÁVEL em `offerCoupon`, ex.: "SOHOJE"), mas o link de saída de CADA oferta exige
+// um salto pelo interstitial /Redirect/to/<offerId> (onde o meli.la está no HTML). ~50%
+// das ofertas resolvem server-side; as "highlight" carregam via JS e são puladas. As COM
+// cupom resolvem bem — e são o valor do Promobit. Retorna {url, coupon?} (contrato rico).
+export const PROMOBIT_SOURCES = [
+  "https://www.promobit.com.br/promocoes/loja/mercado-livre/"
+];
+const PROMOBIT_MAX_RESOLVE = 8; // teto de interstitials/execução (bound de subrequests)
+const PROMOBIT_ML_RE = /https?:\/\/(?:www\.)?(?:mercadolivre\.com\.br|meli\.la)\/[^\s"'<>\\]+/;
+
+function promobitOffers(html) {
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) return [];
+  let data;
+  try { data = JSON.parse(m[1]); } catch (_) { return []; }
+  let arr = null;
+  (function w(o) {
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o) && o.length && o[0] && typeof o[0] === "object" && "offerId" in o[0]) {
+      if (!arr || o.length > arr.length) arr = o;
+    }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === "object") w(o[k]);
+  })(data);
+  if (!arr) return [];
+  return arr
+    .filter((o) => /mercadolivre/i.test(o.storeDomain || ""))
+    .map((o) => ({ id: o.offerId, coupon: o.offerCoupon || null }))
+    .filter((o) => o.id);
+}
+
+export async function crawlPromobit(fetchImpl = fetch) {
+  const out = [];
+  let html;
+  try { html = await fetchHtml(PROMOBIT_SOURCES[0], fetchImpl); } catch (_) { return out; }
+  // prioriza ofertas COM cupom (o diferencial do Promobit) antes de gastar o teto
+  const offers = promobitOffers(html).sort((a, b) => (b.coupon ? 1 : 0) - (a.coupon ? 1 : 0));
+  for (const o of offers.slice(0, PROMOBIT_MAX_RESOLVE)) {
+    try {
+      const intHtml = await fetchHtml("https://www.promobit.com.br/Redirect/to/" + o.id, fetchImpl);
+      const m = intHtml.match(PROMOBIT_ML_RE);
+      if (!m) continue; // carrega via JS → pula
+      out.push(
+        o.coupon
+          ? { url: m[0], coupon: { code: o.coupon, text: "Cupom Promobit no Mercado Livre", source: "promobit" } }
+          : { url: m[0] }
+      );
+    } catch (_) {
+      // pula esta oferta
+    }
+  }
+  return out;
+}
+
 async function fetchHtml(url, fetchImpl) {
   const res = await fetchImpl(url, {
     headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9" },
@@ -101,13 +155,23 @@ async function crawl(sources, fetchImpl) {
 export const crawlPromotop = (fetchImpl = fetch) => crawl(PROMOTOP_SOURCES, fetchImpl);
 export const crawlPechinchou = (fetchImpl = fetch) => crawl(PECHINCHOU_SOURCES, fetchImpl);
 
-// Agregador de descoberta: Promotop + Pechinchou (links de ML diretos no HTML) +
-// Pelando /recentes (dpl → /social, só destinos de ML). Dedup global por link.
+// Agregador de descoberta. Cada fonte devolve string (link) OU {url, coupon}. Normaliza
+// tudo pra {url, coupon?} e dedup por url (preferindo o item que tem cupom).
+// Fontes: Promotop + Pechinchou (links ML diretos) + Pelando /recentes (dpl→/social) +
+// Promobit (interstitial + cupom digitável).
 export async function discoverMlOffers(fetchImpl = fetch) {
-  const groups = await Promise.all([
+  const [promotop, pechinchou, pelando, promobit] = await Promise.all([
     crawl(PROMOTOP_SOURCES, fetchImpl),
     crawl(PECHINCHOU_SOURCES, fetchImpl),
-    crawlPelando(fetchImpl)
+    crawlPelando(fetchImpl),
+    crawlPromobit(fetchImpl)
   ]);
-  return [...new Set(groups.flat())];
+  const byUrl = new Map();
+  const add = (item) => {
+    const o = typeof item === "string" ? { url: item } : item;
+    if (!o || !o.url) return;
+    if (!byUrl.has(o.url) || (o.coupon && !byUrl.get(o.url).coupon)) byUrl.set(o.url, o);
+  };
+  [...promotop, ...pechinchou, ...pelando, ...promobit].forEach(add);
+  return [...byUrl.values()];
 }

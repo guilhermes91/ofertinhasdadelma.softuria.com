@@ -68,8 +68,9 @@ async function run(context) {
 
   const all = await loadOffers(env);
   const existing = new Set(all.map((o) => normalizeLink(o.link)));
+  // candidatos agora são {url, coupon?} (Promobit traz código de cupom digitável)
   const fresh = candidates
-    .filter((l) => !existing.has(normalizeLink(l)))
+    .filter((c) => !existing.has(normalizeLink(c.url)))
     .slice(0, max);
 
   const added = [];
@@ -77,7 +78,8 @@ async function run(context) {
   const errors = [];
   let offers = all;
 
-  for (const link of fresh) {
+  for (const cand of fresh) {
+    const link = cand.url;
     try {
       const scraped = await scrapeOffer(link, env);
       if (!scraped.title || scraped.priceCurrent == null) {
@@ -88,11 +90,13 @@ async function run(context) {
         slugify(scraped.title || "oferta"),
         offers.map((o) => o.slug)
       );
+      // cupom: prefere o código DIGITÁVEL da fonte (Promobit) ao campaignId do ML
+      const coupon = (cand.coupon && cand.coupon.code) ? cand.coupon : scraped.coupon;
       // ⚠️ COMPLIANCE: NUNCA salvar `link` (o meli.la da FONTE tem a tag do concorrente).
       // O bot NÃO gera link de afiliado aqui (EC2 sob demanda + N ofertas = risco de
       // timeout). Grava URL LIMPA + `sourceUrl` (via ...scraped); o relink.yml monetiza
       // quando a EC2 estiver ligada.
-      const candidate = ensureOffer({ ...scraped, slug, link: scraped.productUrl, seller: "Mercado Livre" });
+      const candidate = ensureOffer({ ...scraped, slug, link: scraped.productUrl, coupon, seller: "Mercado Livre" });
       // dedup por id do produto; só refresca (e sobe) se o preço mudou — sem churn.
       const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
       offers = r.offers;
