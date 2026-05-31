@@ -62,6 +62,32 @@ resolve. Ele entra pra refutar e dimensionar.
 
 Mudança trivial (1 linha de CSS, texto) pula a cerimônia.
 
+### 3.1 Níveis de cerimônia (Solo · Par · War Room)
+
+Dimensiona a discussão ao risco (Uno vs. Ferrari):
+
+| Nível | Quando | Como |
+|------|--------|------|
+| **Solo** | trivial (CSS, texto, 1 linha) | maker decide e faz. Sem cerimônia. |
+| **Par** *(default)* | mudança relevante de código | maker propõe → devil do domínio **refuta inline** (1 rodada, narrado) → razão decide → commita o que sobrou. |
+| **War Room** | gatilho abaixo, ou o dono pedir "war room"/"brainstorm" | convoca os especialistas como **sub-agentes REAIS e independentes** (contexto próprio, discordam de verdade — não é monólogo) → cada um refuta/propõe → síntese → decisão narrada. |
+
+**Gatilhos de War Room — o Claude convoca sozinho, não espera o dono:**
+- Arquitetura ou troca de stack.
+- Mexe em **dinheiro/afiliado**, **segurança/secrets**, **infra/DNS/WAF** ou algo **irreversível**.
+- Empate técnico no nível Par, ou o devil achou um buraco real.
+
+**Ritual War Room (5 passos):**
+1. **Definir** — problema + tamanho + critério de sucesso em 1 frase.
+2. **Convocar** — escolher os pares do §3 que importam; subir 1 sub-agente real por perspectiva.
+3. **Refutar** — cada devil tenta QUEBRAR a proposta (bug futuro, custo, vazamento, regressão); adversarial de verdade.
+4. **Sintetizar** — o tech lead pesa, descarta o que caiu, junta o que sobrou.
+5. **Decidir + Verificar** — commita só o que passou; reporta fielmente o testado/não-testado.
+
+**Regra de ouro:** mudança pesada de infra/segurança **nunca** passa em Solo nem em monólogo —
+é onde o crivo a 4 olhos mais vale. *(Gotcha real já registrado: o devil virou monólogo
+justamente aí, nas mudanças de Bot Fight Mode / token / DNS.)*
+
 ---
 
 ## 4. Stack & arquitetura
@@ -114,7 +140,7 @@ Mudança trivial (1 linha de CSS, texto) pula a cerimônia.
 
 ---
 
-## 5. Estado atual (2026-05-28)
+## 5. Estado atual (2026-05-30)
 
 - `main` no ar. SSR + admin + captação funcionando. Auto-deploy a cada push.
 - **WS1 ✅ de-geo nacional** (`SITE.region`, default Brasil) — commit `51791c9`.
@@ -130,12 +156,17 @@ Mudança trivial (1 linha de CSS, texto) pula a cerimônia.
   por tag, FAQ) — commit `a38033c`. Redesign visual fino **pendente** (precisa dos olhos do dono).
 - Plano off-site + TODOs + como armar o bot: **`docs/SEO-PLAYBOOK.md`**.
 
-### Próximos passos (com o dono)
-1. **Validar o bot juntos** e decidir monetização (link de afiliado nosso) → armar cron.
-2. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
-3. **Search Console + GA4** — medir e indexar. Ver playbook §2.
-4. **Redesign visual** do que ficou "confuso" — rodada com prints.
-5. **Backlink/Digital PR** — execução humana. Ver playbook §4.
+### Próximos passos / open loops
+1. 🔴 **War Room Segurança+Infra (PENDENTE — proposto e nunca rodado).** Na sessão anterior o
+   crivo a 4 olhos virou monólogo nas mudanças pesadas. Rodar de verdade (§3.1), cobrindo:
+   rotacionar `CLOUDFLARE_API_TOKEN` (vazou, permissão ampla); Bot Fight Mode OFF na zona
+   `softuria.com` inteira (afeta outros sites); `cf-bot-unblock.yml` público (expõe playbook);
+   dependência da EC2 ligada pra monetização em tempo real.
+2. **Limpeza:** conferir/remover oferta de teste **"Monitor Philips"** se ficou na vitrine.
+3. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
+4. **Search Console + GA4** — medir e indexar. Ver playbook §2.
+5. **Redesign visual** do que ficou "confuso" — rodada com prints.
+6. **Backlink/Digital PR** — execução humana. Ver playbook §4.
 
 ---
 
@@ -226,9 +257,11 @@ Decisão (dono): **scrape de portais** (não API oficial por ora), **só Mercado
 depois), **auto-publicar** + manter captação pública por usuário. Cron a cada ~10 min.
 **Fonte MVP confirmada por probe: Promotop** — `promotop.net/loja/mercado-livre` expõe ~31 links
 `meli.la/...` no HTML server-side. Canaltech e Pelando renderizam no cliente (0 links server-side)
-→ fase 2. **Cron entregue DESARMADO** (manual/`workflow_dispatch`) até validação local de ≥10
-ofertas reais capturadas (exigência do dono). Monetização: o link capturado credita o afiliado do
-portal-fonte; trocar pelo nosso link (gerador ML / API futura) é passo separado — ver SEO-PLAYBOOK.
+→ fase 2. **Cron ARMADO e validado (2026-05-30):** `*/10 * * * *` no `bot.yml`, rodando no ar
+(HTTP 200, capturou ofertas novas). Token aceito via env `BOT_TOKEN` **ou** KV `bot:token`.
+Monetização **resolvida**: a captura cai pra URL de produto limpa e a tag nossa entra via relink/API
+externa (ver §6.6/§6.7). Pausar o cron = comentar o `schedule`. Histórico do bloqueio por Bot Fight
+Mode e o fix estão em §5 (WS3).
 
 ---
 
