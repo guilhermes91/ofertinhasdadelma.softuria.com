@@ -361,6 +361,19 @@ apontou as URLs certas. **Correção honesta:** na 6.9 dei "Pelando inviável" t
   `string` → `{url, coupon}`** — `discoverMlOffers` normaliza/dedup por url, `bot.js` propaga o cupom
   (prefere o código digitável da fonte ao `campaignId` do ML). Validado: 62 candidatos, 8 com cupom.
 
+### 6.9.3 Bot dedup — bug "não republicava ofertas novas"  ✅ CORRIGIDO (2026-05-31)
+
+O filtro pré-scrape comparava a URL do candidato (`meli.la`/`dpl`) com o `link` salvo (URL limpa
+`produto.mercadolivre.com.br`) — **nunca casavam** → `fresh` pegava só os **8 primeiros** candidatos
+(os populares JÁ no catálogo) → `added:0` sempre; ofertas novas (posições 9+, com cupom) nunca eram
+raspadas. **Fix:** `scrapeOffer` → `scrapeOfferRaw` (fase 1 barata, sem Gemini: mlId+preço) +
+`enrichOffer` (fase 2, Gemini); o bot **varre até achar `max` NOVAS** (dedup real por mlId, pula dup
+ANTES do Gemini). Dedup barato extra por `link`/`sourceUrl` salvo. **Limite de subrequests (~50):** cada
+meli.la/dpl segue redirect p/ `/social` (cada hop = +1) → `SCRAPE_BUDGET=12`, `PROMOBIT_MAX_RESOLVE=4`,
+break limpo ao bater no teto (`hitLimit`). **Guarda anti-lixo:** barra título não-produto (lista/perfil).
+**Validado em prod:** 45→53 ofertas, 7 novas num run, hitLimit:false; bestseller agora real (9, não 40
+falsos). Cupom solto (deal `/d/...` sem produto) NÃO é repostado — somos vitrine de produto.
+
 ### 6.9.2 Refresh do catálogo + SEO on-page  (2026-05-30)
 
 - **✅ `/api/refresh` (token-gated, isento de Basic Auth no `_middleware`).** Re-roda `ensureOffer` nas
