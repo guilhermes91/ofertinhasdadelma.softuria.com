@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       api:
-        description: "Base URL da API"
+        description: "Base URL da API (deixe vazio p/ usar o secret AFFILIATE_API_BASE)"
         required: false
-        default: "http://56.125.37.155:8000"
+        default: ""
       seed:
         description: 'Backfill sourceUrl: JSON [{"mlId":"...","sourceUrl":"https://meli.la/..."}]'
         required: false
@@ -23,7 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      API: ${{ github.event.inputs.api || 'http://56.125.37.155:8000' }}
+      # Base da API fora do repo público: input manual OU secret AFFILIATE_API_BASE.
+      API: ${{ github.event.inputs.api || secrets.AFFILIATE_API_BASE }}
       SEED: ${{ github.event.inputs.seed }}
       SITE: https://ofertinhasdadelma.softuria.com
       BUA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -32,6 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${BOT_TOKEN:-}" ]; then echo "::error::BOT_TOKEN ausente."; exit 1; fi
+          if [ -z "${API:-}" ]; then echo "::error::Base da API ausente: passe o input 'api' ou configure o secret AFFILIATE_API_BASE."; exit 1; fi
 
           if [ -n "${SEED:-}" ]; then
             echo "== 0) seed de sourceUrl =="

@@ -157,12 +157,14 @@ justamente aí, nas mudanças de Bot Fight Mode / token / DNS.)*
 - Plano off-site + TODOs + como armar o bot: **`docs/SEO-PLAYBOOK.md`**.
 
 ### Próximos passos / open loops
-1. 🔴 **War Room Segurança+Infra (PENDENTE — proposto e nunca rodado).** Na sessão anterior o
-   crivo a 4 olhos virou monólogo nas mudanças pesadas. Rodar de verdade (§3.1), cobrindo:
-   rotacionar `CLOUDFLARE_API_TOKEN` (vazou, permissão ampla); Bot Fight Mode OFF na zona
-   `softuria.com` inteira (afeta outros sites); `cf-bot-unblock.yml` público (expõe playbook);
-   dependência da EC2 ligada pra monetização em tempo real.
-2. **Limpeza:** conferir/remover oferta de teste **"Monitor Philips"** se ficou na vitrine.
+1. ✅ **War Room Segurança+Infra RODOU (2026-05-30)** — §3.1 de verdade, 3 sub-agentes reais e
+   independentes (Segurança/Deploy maker · Red-team devil · Infra Cloudflare×AWS). Síntese e
+   **checklist de ações do dono** em §6.6.0. Parte autônoma (código) **FEITA**. **🔴 Resta o dono:**
+   rotacionar `CLOUDFLARE_API_TOKEN` (2 tokens, escopo mínimo), purgar a sessão ML do KV + trocar
+   senha ML, decidir BFM (deixar OFF documentado vs Cron Trigger), fechar a porta 8000 da EC2.
+2. ✅ **Limpeza "Monitor Philips":** **NADA a remover** — verificado em produção (2026-05-30): é
+   captura legítima (R$ 389,90, imagem, `mlId`), e o `meli.la` resolve pra **nossa tag** `sade9179546`.
+   Bônus: **42/42 ofertas com nosso link, 0 sem comissão** (catálogo 100% monetizado agora).
 3. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
 4. **Search Console + GA4** — medir e indexar. Ver playbook §2.
 5. **Redesign visual** do que ficou "confuso" — rodada com prints.
@@ -171,6 +173,51 @@ justamente aí, nas mudanças de Bot Fight Mode / token / DNS.)*
 ---
 
 ## 6. Decisões tomadas / em andamento
+
+### 6.6.0 War Room Segurança+Infra  ✅ RODOU (2026-05-30)
+
+Convocado de verdade (§3.1): **3 sub-agentes reais e independentes** — Segurança/Deploy (maker),
+Red-team (devil), Infra Cloudflare×AWS (par adversarial). O atrito achou o que o monólogo perdeu.
+
+**Veredito (impacto decrescente):**
+1. 🔴 **`CLOUDFLARE_API_TOKEN` é o ÚNICO incêndio de horas.** Vazou em transcript; escopo
+   amplíssimo (WAF/DNS/Bot Mgmt/**Pages env vars**) na zona `softuria.com` inteira. Pior caso real:
+   DNS hijack de qualquer subdomínio, sobrescrever env vars do Pages (sequestrar `AFFILIATE_API_URL`
+   → roubar a monetização; ou apagar `GEMINI_API_KEY`/`BOT_TOKEN`). **Cura:** 2 tokens —
+   deploy mínimo (Pages:Edit + Account:Read) no GitHub Secret, e um token de operador **fora do repo**
+   pras ações WAF/DNS/BFM. Rotação com downtime zero: cria novo → troca secret → deploy de teste →
+   **só então revoga o antigo**.
+2. 🔴 **Sessão ML vazada (furo NOVO do red-team).** O cookie do painel de afiliados ML está no KV
+   (`ml:session`) e vazou em transcript = secret de conta real. **Cura:** trocar senha ML + invalidar
+   sessões + `OFFERS_KV.delete("ml:session")`. (A proposta original ignorava isto.)
+3. **BFM é armadilha no Free.** Os 3 confirmaram: a skip-rule **NÃO** desarma o Bot Fight Mode no
+   plano Free (é teatro); re-ligar BFM **requebra o cron** do bot. Opções reais: (a) deixar **OFF**
+   documentado como dívida (blast radius baixo — BFM Free é filtro fraco, o ativo está atrás de
+   `BOT_TOKEN`); ou (b) **portar o bot pra Cron Trigger de Worker** (roda dentro do edge, não passa
+   pelo BFM) → aí BFM volta a ligar. Decisão de arquitetura/dono.
+4. **EC2/monetização:** portar a geração pro edge é **inviável** (a API usa sessão ML/Playwright,
+   Workers não rodam browser) — convergência Cloudflare×AWS. O ROI real **não** é trocar a EC2, é
+   instrumentar a **perda silenciosa de comissão** (alarme via `/api/relink?list=1`, que já calcula
+   o número). Migrar EC2→Lambda on-demand é "fase 2" (devil AWS), só se quiser relink 100% automático.
+5. **`cf-bot-unblock.yml` público:** **divergência registrada.** Red-team venceu — remover é
+   teatro enquanto o token vive, e perde a ferramenta de diagnóstico. **Decisão: MANTER**; restringir
+   (mover ações destrutivas pra fora do repo) só **depois** da rotação do token.
+
+**Feito nesta sessão (autônomo, código/repo, reversível):**
+- IP cru da EC2 (`...:8000`) **removido** de `relink.yml` (agora secret `AFFILIATE_API_BASE`) e do
+  `CONTEXTO.md` — fechava o furo que anulava o esforço de tirar o hostname do repo público.
+- Token gate de `/api/bot` e `/api/relink` agora **constant-time** (reusa `constantTimeEquals` de
+  `auth.js`) — higiene, consistente com o Basic Auth.
+- Verificado em produção: **42/42 ofertas monetizadas**, "Monitor Philips" é legítima (nossa tag).
+
+**🔴 CHECKLIST DO DONO (não-autônomo — dinheiro/identidade/irreversível):**
+- [ ] **Rotacionar `CLOUDFLARE_API_TOKEN`** (2 tokens, escopo mínimo; revogar o antigo só após validar).
+- [ ] **Trocar senha da conta de afiliado ML** + invalidar sessões; depois purgar `ml:session` do KV.
+- [ ] **Decidir BFM:** deixar OFF (documentar dívida) **ou** aprovar portar o bot pra Cron Trigger.
+- [ ] **Fechar a porta 8000 da EC2** no security group (IP já é público no histórico git — esconder
+      não basta; o durável é o SG) e **configurar o secret `AFFILIATE_API_BASE`** no GitHub.
+- [ ] (Opcional) Aprovar alarme de comissão (`/api/relink?list=1`) e/ou migração EC2→Lambda.
+
 
 ### 6.1 De-geo → nacional  ✅ FEITO (2026-05-28)
 
@@ -220,7 +267,8 @@ não tem preço server-side → scrape do edge dá 422. Gerir subdomínio/env: `
 
 ### 6.7 Geração de link delegada à API externa  ✅ FEITO (2026-05-30)
 Decisão do dono: a geração do link de afiliado passa a ser da API **`gerador-link-afiliados`**
-(`http://56.125.37.155:8000`, EC2 sob demanda). O edge **não** chama a API (porta 8000 bloqueada no
+(EC2 sob demanda; base da API fora do repo público — secret `AFFILIATE_API_BASE` no GitHub /
+env `AFFILIATE_API_URL` no Pages). O edge **não** chama a API (porta 8000 bloqueada no
 `fetch` do Workers + EC2 pode estar off → travaria); a monetização roda no **GitHub Actions**
 (`relink.yml`): `/health` → `GET /api/relink?list=1` → `POST /v2/generate/batch` → `POST /api/relink
 {updates}`. Edge segue gravando URL limpa (compliant). `affiliate.js` virou cliente fino

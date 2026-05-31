@@ -17,6 +17,7 @@ import {
 } from "../_lib/data.js";
 import { jsonResponse } from "../_lib/render.js";
 import { discoverMlOffers } from "../_lib/portals.js";
+import { constantTimeEquals } from "../_lib/auth.js";
 
 const DEFAULT_MAX = 8; // teto por execução — protege a cota do Gemini
 const HARD_MAX = 20;
@@ -45,7 +46,7 @@ async function run(context) {
     (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "") ||
     url.searchParams.get("token") ||
     "";
-  if (provided !== expected) {
+  if (!constantTimeEquals(provided, expected)) {
     return jsonResponse({ error: "Token inválido." }, { status: 401 });
   }
 

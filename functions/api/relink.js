@@ -15,6 +15,7 @@
 
 import { loadOffers, saveOffers, mlIdFromUrl } from "../_lib/data.js";
 import { jsonResponse } from "../_lib/render.js";
+import { constantTimeEquals } from "../_lib/auth.js";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -64,7 +65,7 @@ async function run(context, method) {
     (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "") ||
     url.searchParams.get("token") ||
     "";
-  if (provided !== expected) return jsonResponse({ error: "Token inválido." }, { status: 401 });
+  if (!constantTimeEquals(provided, expected)) return jsonResponse({ error: "Token inválido." }, { status: 401 });
 
   const tag = env.ML_AFFILIATE_TAG || OUR_TAG_DEFAULT;
   const offers = await loadOffers(env);

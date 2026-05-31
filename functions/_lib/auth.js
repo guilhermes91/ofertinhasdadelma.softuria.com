@@ -30,7 +30,7 @@ export function checkBasicAuth(request, env) {
   return constantTimeEquals(user, expectedUser) && constantTimeEquals(pass, expectedPass);
 }
 
-function constantTimeEquals(a, b) {
+export function constantTimeEquals(a, b) {
   if (a == null || b == null) return false;
   if (a.length !== b.length) return false;
   let mismatch = 0;
