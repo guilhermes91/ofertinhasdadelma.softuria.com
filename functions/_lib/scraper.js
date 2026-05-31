@@ -12,7 +12,10 @@ const REDIRECTOR_HOSTS = [/(?:^|\.)dpl\.pelando\.com\.br$/i];
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-export async function scrapeOffer(rawUrl, env) {
+// Fase 1 (BARATA, sem Gemini): baixa o HTML e extrai o que dá pra decidir dedup —
+// mlId, preço, imagem, bestseller, cupom. O bot usa isto pra pular duplicado ANTES
+// de gastar cota de IA. Retorna a "base" pra fase 2.
+export async function scrapeOfferRaw(rawUrl) {
   const url = normalizeUrl(rawUrl);
   const host = url ? new URL(url).hostname : "";
   const allowed = ML_HOSTS.some((rx) => rx.test(host)) || REDIRECTOR_HOSTS.some((rx) => rx.test(host));
@@ -39,12 +42,17 @@ export async function scrapeOffer(rawUrl, env) {
   // afiliados (validado): produto.mercadolivre.com.br/MLB-<id>. (/p/MLB... e /social dão erro 111.)
   const productUrl = `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}`;
 
-  const enriched = await enrichWithGemini(raw, url, env);
+  return { url, raw, coupon, mlId, productUrl, sourceUrl: rawUrl };
+}
 
-  const merged = {
+// Fase 2 (CARA, com Gemini): enriquece a base já extraída.
+export async function enrichOffer(base, env) {
+  const { url, raw, coupon, mlId, productUrl, sourceUrl } = base;
+  const enriched = await enrichWithGemini(raw, url, env);
+  return {
     mlId,
     productUrl,
-    sourceUrl: rawUrl, // link original (meli.la da fonte / colado) p/ gerar o nosso afiliado
+    sourceUrl, // link original (meli.la da fonte / colado) p/ gerar o nosso afiliado
 
     title: enriched.title || raw.title || "",
     description: enriched.description || raw.description || "",
@@ -55,7 +63,7 @@ export async function scrapeOffer(rawUrl, env) {
     priceCurrent: raw.priceCurrent ?? null,
     priceOld: raw.priceOld ?? null,
     discount: raw.discount ?? null,
-    link: rawUrl,
+    link: sourceUrl,
     tags: Array.isArray(enriched.tags)
       ? enriched.tags.slice(0, 5).map((t) => slugify(t)).filter(Boolean)
       : [],
@@ -64,8 +72,12 @@ export async function scrapeOffer(rawUrl, env) {
     coupon,
     seller: "Mercado Livre"
   };
+}
 
-  return merged;
+// Pipeline completo (fase 1 + 2). Usado pelo /captar (1 link só).
+export async function scrapeOffer(rawUrl, env) {
+  const base = await scrapeOfferRaw(rawUrl);
+  return enrichOffer(base, env);
 }
 
 // Extrai cupom do link/HTML do Mercado Livre. O ML aplica desconto por CAMPANHA

@@ -5,7 +5,7 @@
 //
 // Uso: POST/GET /api/bot?max=8[&dry=1]  com  Authorization: Bearer <BOT_TOKEN>
 
-import { scrapeOffer } from "../_lib/scraper.js";
+import { scrapeOfferRaw, enrichOffer } from "../_lib/scraper.js";
 import {
   loadOffers,
   saveOffers,
@@ -19,8 +19,14 @@ import { jsonResponse } from "../_lib/render.js";
 import { discoverMlOffers } from "../_lib/portals.js";
 import { constantTimeEquals } from "../_lib/auth.js";
 
-const DEFAULT_MAX = 8; // teto por execução — protege a cota do Gemini
+const DEFAULT_MAX = 8; // teto de ofertas NOVAS publicadas por execução
 const HARD_MAX = 20;
+// teto de fetch+extract (fase 1, sem Gemini) por execução — varremos até `max` novas
+// OU até este teto, o que vier antes. Bound do limite de subrequests do Workers (~50):
+// descoberta (~13) + SCRAPE_BUDGET + Gemini (≤max) fica folgado abaixo de 50.
+const SCRAPE_BUDGET = 22;
+// títulos que NÃO são de produto (páginas de lista/perfil/recomendações do ML)
+const JUNK_TITLE = /minhas listas|recomenda(ç|c)|listas? de\b|^ofertas\b|^mercado livre$/i;
 
 export async function onRequestPost(context) {
   return run(context);
@@ -67,45 +73,66 @@ async function run(context) {
   }
 
   const all = await loadOffers(env);
-  const existing = new Set(all.map((o) => normalizeLink(o.link)));
-  // candidatos agora são {url, coupon?} (Promobit traz código de cupom digitável)
-  const fresh = candidates
-    .filter((c) => !existing.has(normalizeLink(c.url)))
-    .slice(0, max);
+  const existingLinks = new Set(all.map((o) => normalizeLink(o.link)));
+  // dedup REAL é por mlId (o link do candidato — meli.la/dpl — nunca bate com a URL
+  // limpa salva, então filtrar por link era no-op: pegava sempre os 8 primeiros, que
+  // são os populares JÁ no catálogo → nada novo entrava). Agora varremos os candidatos
+  // até achar `max` ofertas NOVAS, pulando duplicado por mlId ANTES do Gemini.
+  const byMlId = new Map(all.filter((o) => o.mlId).map((o) => [o.mlId, o]));
 
   const added = [];
   const refreshed = [];
   const errors = [];
   let offers = all;
+  let scraped = 0; // teto de fetch+extract por execução (bound de subrequests)
 
-  for (const cand of fresh) {
+  for (const cand of candidates) {
+    if (added.length >= max || scraped >= SCRAPE_BUDGET) break;
     const link = cand.url;
+    if (existingLinks.has(normalizeLink(link))) continue; // link exato já gravado (raro)
+
+    let base;
     try {
-      const scraped = await scrapeOffer(link, env);
-      if (!scraped.title || scraped.priceCurrent == null) {
-        errors.push({ link, reason: "sem título ou preço" });
-        continue;
-      }
-      const slug = uniqueSlug(
-        slugify(scraped.title || "oferta"),
-        offers.map((o) => o.slug)
-      );
-      // cupom: prefere o código DIGITÁVEL da fonte (Promobit) ao campaignId do ML
-      const coupon = (cand.coupon && cand.coupon.code) ? cand.coupon : scraped.coupon;
-      // ⚠️ COMPLIANCE: NUNCA salvar `link` (o meli.la da FONTE tem a tag do concorrente).
-      // O bot NÃO gera link de afiliado aqui (EC2 sob demanda + N ofertas = risco de
-      // timeout). Grava URL LIMPA + `sourceUrl` (via ...scraped); o relink.yml monetiza
-      // quando a EC2 estiver ligada.
-      const candidate = ensureOffer({ ...scraped, slug, link: scraped.productUrl, coupon, seller: "Mercado Livre" });
-      // dedup por id do produto; só refresca (e sobe) se o preço mudou — sem churn.
-      const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
-      offers = r.offers;
-      const info = { slug: r.offer.slug, title: r.offer.title, price: r.offer.priceCurrent };
-      if (r.action === "added") added.push(info);
-      else if (r.action === "refreshed") refreshed.push(info);
+      base = await scrapeOfferRaw(link); // fase 1: barata, sem Gemini
     } catch (err) {
-      errors.push({ link, reason: err.message || "falha no scrape" });
+      errors.push({ link, reason: err.message || "falha no fetch" });
+      continue;
     }
+    scraped += 1;
+    if (!base.raw.title || base.raw.priceCurrent == null) {
+      errors.push({ link, reason: "sem título ou preço" });
+      continue;
+    }
+    // Guarda anti-lixo: alguns links resolvem pra página de LISTA/PERFIL do ML (não um
+    // produto), com og:title genérico ("Minhas listas de recomendações") e um preço de
+    // card qualquer. Não publica.
+    if (JUNK_TITLE.test(base.raw.title)) {
+      errors.push({ link, reason: "título não-produto (lista/perfil)" });
+      continue;
+    }
+    // dedup por id do produto: já existe e preço igual → pula SEM gastar Gemini.
+    const dup = byMlId.get(base.mlId);
+    if (dup && Number(dup.priceCurrent || 0) === Number(base.raw.priceCurrent || 0)) continue;
+
+    let scrapedOffer;
+    try {
+      scrapedOffer = await enrichOffer(base, env); // fase 2: Gemini só p/ novo/mudou
+    } catch (err) {
+      errors.push({ link, reason: err.message || "falha no enrich" });
+      continue;
+    }
+    const slug = uniqueSlug(slugify(scrapedOffer.title || "oferta"), offers.map((o) => o.slug));
+    // cupom: prefere o código DIGITÁVEL da fonte (Promobit) ao campaignId do ML
+    const coupon = (cand.coupon && cand.coupon.code) ? cand.coupon : scrapedOffer.coupon;
+    // ⚠️ COMPLIANCE: NUNCA salvar `link` (o meli.la da FONTE tem a tag do concorrente).
+    // Grava URL LIMPA + `sourceUrl`; o relink.yml monetiza quando a EC2 estiver ligada.
+    const candidate = ensureOffer({ ...scrapedOffer, slug, link: scrapedOffer.productUrl, coupon, seller: "Mercado Livre" });
+    const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
+    offers = r.offers;
+    byMlId.set(candidate.mlId, r.offer); // não reprocessa o mesmo produto neste run
+    const info = { slug: r.offer.slug, title: r.offer.title, price: r.offer.priceCurrent };
+    if (r.action === "added") added.push(info);
+    else if (r.action === "refreshed") refreshed.push(info);
   }
 
   if (!dry && (added.length || refreshed.length)) {
@@ -116,7 +143,7 @@ async function run(context) {
     ok: true,
     source: "promotop+pechinchou+pelando+promobit",
     candidates: candidates.length,
-    fresh: fresh.length,
+    scraped,
     added: added.length,
     refreshed: refreshed.length,
     dry,
