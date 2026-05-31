@@ -6,8 +6,18 @@ export async function onRequestGet(context) {
   const tags = tagCounts(offers);
   const today = new Date().toISOString().slice(0, 10);
 
+  // lastmod real por tag = data da oferta mais recente daquela tag (melhora crawl budget)
+  const tagLastmod = new Map();
+  for (const o of offers) {
+    const d = (o.addedAt || today).slice(0, 10);
+    for (const t of o.tags || []) {
+      if (!tagLastmod.has(t) || d > tagLastmod.get(t)) tagLastmod.set(t, d);
+    }
+  }
+
   const urls = [
     { loc: `${SITE.origin}/`, lastmod: today, changefreq: "daily", priority: "1.0" },
+    { loc: `${SITE.origin}/categorias`, lastmod: today, changefreq: "weekly", priority: "0.5" },
     { loc: `${SITE.origin}/captar`, lastmod: today, changefreq: "monthly", priority: "0.3" }
   ];
 
@@ -15,7 +25,7 @@ export async function onRequestGet(context) {
   for (const t of tags.filter((t) => t.count >= 2)) {
     urls.push({
       loc: `${SITE.origin}/tag/${encodeURIComponent(t.slug)}/`,
-      lastmod: today,
+      lastmod: tagLastmod.get(t.slug) || today,
       changefreq: "weekly",
       priority: "0.7"
     });

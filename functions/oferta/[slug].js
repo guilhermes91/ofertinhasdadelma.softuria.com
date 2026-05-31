@@ -53,13 +53,17 @@ export async function onRequestGet(context) {
     }
   };
 
+  // Categoria (1ª tag) como nível intermediário do breadcrumb — trilha SEO + link interno
+  // pra página de tag forte.
+  const cat = (offer.tags || [])[0] || "";
+  const catLabel = cat ? humanizeTag(cat) : "";
+  const crumbItems = [{ "@type": "ListItem", position: 1, name: "Início", item: SITE.origin + "/" }];
+  if (cat) crumbItems.push({ "@type": "ListItem", position: 2, name: catLabel, item: `${SITE.origin}/tag/${cat}/` });
+  crumbItems.push({ "@type": "ListItem", position: crumbItems.length + 1, name: offer.title, item: `${SITE.origin}/oferta/${offer.slug}/` });
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Início", item: SITE.origin + "/" },
-      { "@type": "ListItem", position: 2, name: offer.title, item: `${SITE.origin}/oferta/${offer.slug}/` }
-    ]
+    itemListElement: crumbItems
   };
 
   // Cluster de hashtags (visão do dono: loja + cupom + categoria/marca + modelo).
@@ -111,7 +115,9 @@ export async function onRequestGet(context) {
     <section class="detail">
       <div class="container detail__grid">
         <nav class="breadcrumb" aria-label="Trilha de navegação">
-          <a href="/">Início</a> <span aria-hidden="true">›</span> <span>${escapeHtml(offer.title)}</span>
+          <a href="/">Início</a> <span aria-hidden="true">›</span> ${
+            cat ? `<a href="/tag/${escapeHtml(cat)}/">${escapeHtml(catLabel)}</a> <span aria-hidden="true">›</span> ` : ""
+          }<span>${escapeHtml(offer.title)}</span>
         </nav>
         <div class="detail__media">
           ${

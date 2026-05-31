@@ -143,11 +143,22 @@ export async function onRequestGet(context) {
         }))
       };
 
+  // canonical/prev/next cientes de página (sort fica FORA do canonical p/ não duplicar)
+  const pageUrl = (p) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (p > 1) sp.set("page", String(p));
+    const s = sp.toString();
+    return s ? `/?${s}` : "/";
+  };
+
   return htmlResponse(
     layout({
       title,
       description,
-      canonical: q ? `/?q=${encodeURIComponent(q)}` : "/",
+      canonical: pageUrl(view.page),
+      prev: view.page > 1 ? pageUrl(view.page - 1) : null,
+      next: view.page < view.totalPages ? pageUrl(view.page + 1) : null,
       body,
       offers: all,
       jsonLd: [websiteLd, itemListLd, faqLd],

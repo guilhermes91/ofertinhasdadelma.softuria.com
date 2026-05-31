@@ -74,11 +74,15 @@ export async function onRequestGet(context) {
   const title = `${label} em oferta — achadinhos selecionados | ${SITE.name}`;
   const description = `Achadinhos de ${label.toLowerCase()} com preço bom e link direto pro Mercado Livre. Curado pela Delma.`;
 
+  const pageUrl = (p) => (p > 1 ? `/tag/${slug}/?page=${p}` : `/tag/${slug}/`);
+
   return htmlResponse(
     layout({
       title,
       description,
-      canonical: `/tag/${slug}/`,
+      canonical: pageUrl(view.page),
+      prev: view.page > 1 ? pageUrl(view.page - 1) : null,
+      next: view.page < view.totalPages ? pageUrl(view.page + 1) : null,
       body,
       offers: all,
       jsonLd: [itemListLd, breadcrumbLd]

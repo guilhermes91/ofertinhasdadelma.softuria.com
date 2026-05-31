@@ -64,6 +64,8 @@ export function layout({
   body,
   offers = [],
   canonical = "/",
+  prev = null,
+  next = null,
   ogImage,
   jsonLd = [],
   noindex = false,
@@ -72,6 +74,10 @@ export function layout({
   const safeTitle = escapeHtml(title || SITE.name);
   const safeDesc = escapeHtml(description || SITE.description);
   const url = canonical.startsWith("http") ? canonical : `${SITE.origin}${canonical}`;
+  const abs = (p) => (p && p.startsWith("http") ? p : `${SITE.origin}${p}`);
+  const relLinks =
+    (prev ? `\n  <link rel="prev" href="${escapeHtml(abs(prev))}" />` : "") +
+    (next ? `\n  <link rel="next" href="${escapeHtml(abs(next))}" />` : "");
   const og = ogImage || `${SITE.origin}/og-cover.svg`;
   // Só categorias com ≥2 ofertas viram chip "Em alta": tag de 1 item = página thin
   // que o Google rebaixa (e chip que leva a quase-nada). Ver War Room 2026-05-30.
@@ -99,7 +105,7 @@ export function layout({
   <meta name="robots" content="${noindex ? "noindex,follow" : "index,follow,max-image-preview:large"}" />
   <meta name="theme-color" content="#fff5ec" />
   <meta name="author" content="Softuria" />
-  <link rel="canonical" href="${escapeHtml(url)}" />
+  <link rel="canonical" href="${escapeHtml(url)}" />${relLinks}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/logo-mark.svg" />
   <meta property="og:locale" content="pt_BR" />
@@ -178,7 +184,7 @@ export function header(searchQuery = "", topTags = []) {
       </div>
       ${
         tagsHtml
-          ? `<div class="container tagstrip" aria-label="Categorias em destaque"><span class="tagstrip__label">Em alta:</span>${tagsHtml}</div>`
+          ? `<div class="container tagstrip" aria-label="Categorias em destaque"><span class="tagstrip__label">Em alta:</span>${tagsHtml}<a class="taglink taglink--all" href="/categorias">Ver todas →</a></div>`
           : ""
       }
     </header>
