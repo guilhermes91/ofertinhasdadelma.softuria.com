@@ -10,7 +10,10 @@
 // numa porta permitida). Mesmo aí, degrada com segurança: qualquer falha → null, e o
 // caller usa a URL de produto LIMPA — NUNCA o link da fonte/concorrente.
 
-const TIMEOUT_MS = 4000; // curto: edge não pode pendurar
+// Hostname (NÃO IP — o fetch do Workers recusa IP cru com erro 1003). DNS-only.
+// Sobrescrevível por AFFILIATE_API_URL (ex.: quando a API for exposta em HTTPS/443).
+const DEFAULT_API_BASE = "http://oj0d367pnr.softuria.com:8000";
+const TIMEOUT_MS = 9000; // cobre o fallback v1 (playwright ~7s); ainda seguro p/ 1 oferta
 const GENERATE_PATH = "/v2/generate";
 
 // compat: /api/ml-session (legado) ainda importa isto. A sessão ML agora é da API externa.
@@ -50,7 +53,6 @@ export function pickLink(data) {
 // Orquestrador usado por bot.js / captar.js (edge). Só chama a API se configurada.
 export async function generateAffiliate(productUrl, env) {
   if (!productUrl) return null;
-  const base = env && env.AFFILIATE_API_URL;
-  if (!base) return null; // edge não chama a API por padrão (ver topo) → caller usa URL limpa
+  const base = (env && env.AFFILIATE_API_URL) || DEFAULT_API_BASE;
   return affiliateFromApi(productUrl, base);
 }
