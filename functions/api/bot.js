@@ -24,7 +24,7 @@ const HARD_MAX = 20;
 // teto de fetch+extract (fase 1, sem Gemini) por execução — varremos até `max` novas
 // OU até este teto, o que vier antes. Bound do limite de subrequests do Workers (~50):
 // descoberta (~13) + SCRAPE_BUDGET + Gemini (≤max) fica folgado abaixo de 50.
-const SCRAPE_BUDGET = 22;
+const SCRAPE_BUDGET = 12;
 // títulos que NÃO são de produto (páginas de lista/perfil/recomendações do ML)
 const JUNK_TITLE = /minhas listas|recomenda(ç|c)|listas? de\b|^ofertas\b|^mercado livre$/i;
 
@@ -73,11 +73,16 @@ async function run(context) {
   }
 
   const all = await loadOffers(env);
-  const existingLinks = new Set(all.map((o) => normalizeLink(o.link)));
-  // dedup REAL é por mlId (o link do candidato — meli.la/dpl — nunca bate com a URL
-  // limpa salva, então filtrar por link era no-op: pegava sempre os 8 primeiros, que
-  // são os populares JÁ no catálogo → nada novo entrava). Agora varremos os candidatos
-  // até achar `max` ofertas NOVAS, pulando duplicado por mlId ANTES do Gemini.
+  // dedup BARATO (sem fetch): pula candidato cujo link já é o `link` salvo OU o
+  // `sourceUrl` salvo. Os links meli.la são estáveis por oferta, então isso evita
+  // re-raspar os populares JÁ no catálogo e libera o orçamento p/ as NOVAS. (dpl do
+  // Pelando é efêmero → não casa; esses caem no dedup por mlId pós-scrape.)
+  const seen = new Set();
+  for (const o of all) {
+    if (o.link) seen.add(normalizeLink(o.link));
+    if (o.sourceUrl) seen.add(normalizeLink(o.sourceUrl));
+  }
+  // dedup REAL é por mlId (o link do candidato pode não bater com a URL limpa salva).
   const byMlId = new Map(all.filter((o) => o.mlId).map((o) => [o.mlId, o]));
 
   const added = [];
@@ -85,16 +90,19 @@ async function run(context) {
   const errors = [];
   let offers = all;
   let scraped = 0; // teto de fetch+extract por execução (bound de subrequests)
+  let hitLimit = false;
 
   for (const cand of candidates) {
     if (added.length >= max || scraped >= SCRAPE_BUDGET) break;
     const link = cand.url;
-    if (existingLinks.has(normalizeLink(link))) continue; // link exato já gravado (raro)
+    if (seen.has(normalizeLink(link))) continue; // já processado (link ou sourceUrl salvo)
 
     let base;
     try {
       base = await scrapeOfferRaw(link); // fase 1: barata, sem Gemini
     } catch (err) {
+      // bateu no teto de subrequests do Worker → para limpo (não cospe N erros)
+      if (/too many subrequests/i.test(err.message || "")) { hitLimit = true; break; }
       errors.push({ link, reason: err.message || "falha no fetch" });
       continue;
     }
@@ -118,6 +126,7 @@ async function run(context) {
     try {
       scrapedOffer = await enrichOffer(base, env); // fase 2: Gemini só p/ novo/mudou
     } catch (err) {
+      if (/too many subrequests/i.test(err.message || "")) { hitLimit = true; break; }
       errors.push({ link, reason: err.message || "falha no enrich" });
       continue;
     }
@@ -144,6 +153,7 @@ async function run(context) {
     source: "promotop+pechinchou+pelando+promobit",
     candidates: candidates.length,
     scraped,
+    hitLimit,
     added: added.length,
     refreshed: refreshed.length,
     dry,

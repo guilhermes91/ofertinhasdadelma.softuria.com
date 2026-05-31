@@ -84,7 +84,7 @@ export async function crawlPelando(fetchImpl = fetch) {
 export const PROMOBIT_SOURCES = [
   "https://www.promobit.com.br/promocoes/loja/mercado-livre/"
 ];
-const PROMOBIT_MAX_RESOLVE = 8; // teto de interstitials/execução (bound de subrequests)
+const PROMOBIT_MAX_RESOLVE = 4; // teto de interstitials/execução (bound de subrequests)
 const PROMOBIT_ML_RE = /https?:\/\/(?:www\.)?(?:mercadolivre\.com\.br|meli\.la)\/[^\s"'<>\\]+/;
 
 function promobitOffers(html) {
