@@ -55,6 +55,14 @@ jobs:
               curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":false,"crawler_protection":"disabled"}' | python3 -c "import sys,json;d=json.load(sys.stdin);print('OK' if d.get('success') else 'ERRO');print(json.dumps(d.get('result',d),indent=2)[:500])" || true ;;
             enable-bfm)
               curl -sS -X PUT -H "$AUTH" -H "$CT" "$B/zones/$ZID/bot_management" --data '{"fight_mode":true}' | python3 -m json.tool || true ;;
+            dns-add)
+              echo "== cria A record oj0d367pnr.softuria.com -> 56.125.37.155 (DNS-only) =="
+              curl -sS -X POST -H "$AUTH" -H "$CT" "$B/zones/$ZID/dns_records" \
+                --data '{"type":"A","name":"oj0d367pnr","content":"56.125.37.155","ttl":1,"proxied":false}' \
+                | python3 -c "import sys,json;d=json.load(sys.stdin);print('OK '+d['result']['name'] if d.get('success') else 'ERRO '+json.dumps(d.get('errors'))[:300])" ;;
+            dns-rm)
+              RID=$(curl -sS -H "$AUTH" "$B/zones/$ZID/dns_records?type=A&name=oj0d367pnr.softuria.com" | python3 -c "import sys,json;r=json.load(sys.stdin).get('result',[]);print(r[0]['id'] if r else '')")
+              [ -n "$RID" ] && curl -sS -X DELETE -H "$AUTH" "$B/zones/$ZID/dns_records/$RID" | python3 -c "import sys,json;print('REMOVIDO' if json.load(sys.stdin).get('success') else 'ERRO')" || echo "nao achei o record" ;;
             skip-rule)
               echo "== cria WAF custom rule (skip) p/ o /api/bot =="
               EP=$(curl -sS -H "$AUTH" "$B/zones/$ZID/rulesets/phases/http_request_firewall_custom/entrypoint")
