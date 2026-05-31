@@ -29,7 +29,9 @@ export async function onRequestGet(context) {
     offer.seoDescription ||
     `${offer.title} com preço bom e link direto no Mercado Livre. Veja antes que acabe.`;
 
-  const priceValidUntil = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  // Achadinho dura horas/dias, não 2 semanas. Janela curta = schema não "mente" preço
+  // pro Google (preço inválido = perda de rich result). Ver War Room 2026-05-30.
+  const priceValidUntil = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
   const productLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -60,12 +62,41 @@ export async function onRequestGet(context) {
     ]
   };
 
-  const tagsHtml = (offer.tags || [])
-    .map(
-      (t) =>
-        `<a class="taglink" href="/tag/${escapeHtml(t)}/">#${escapeHtml(humanizeTag(t))}</a>`
-    )
-    .join("");
+  // Cluster de hashtags (visão do dono: loja + cupom + categoria/marca + modelo).
+  // Papéis com PÁGINA própria (categoria/marca) linkam /tag (SEO navegável); os de
+  // DESCOBERTA (loja, modelo) linkam pra BUSCA — dá o "achar" sem criar página thin.
+  const hashtags = [];
+  if (offer.store) {
+    hashtags.push(
+      `<a class="taglink taglink--store" href="/?q=${encodeURIComponent("mercado livre")}">#${escapeHtml(humanizeTag(offer.store)).replace(/\s+/g, "")}</a>`
+    );
+  }
+  if (offer.coupon && (offer.coupon.code || offer.coupon.campaignId)) {
+    hashtags.push(`<a class="taglink taglink--coupon" href="/?q=cupom">#Cupom</a>`);
+  }
+  for (const t of offer.tags || []) {
+    hashtags.push(`<a class="taglink" href="/tag/${escapeHtml(t)}/">#${escapeHtml(humanizeTag(t))}</a>`);
+  }
+  if (offer.model) {
+    hashtags.push(
+      `<a class="taglink taglink--model" href="/?q=${encodeURIComponent(offer.model)}">#${escapeHtml(humanizeTag(offer.model)).replace(/\s+/g, "")}</a>`
+    );
+  }
+  const tagsHtml = hashtags.join("");
+
+  const couponHtml = offer.coupon && (offer.coupon.code || offer.coupon.campaignId)
+    ? `<div class="detail__coupon" role="group" aria-label="Cupom de desconto">
+         <span class="detail__coupon-icon" aria-hidden="true">🎟️</span>
+         <div class="detail__coupon-info">
+           <span class="detail__coupon-text">${escapeHtml(offer.coupon.text || "Cupom de desconto")}</span>
+           ${
+             offer.coupon.code
+               ? `<button type="button" class="detail__coupon-code" data-coupon="${escapeHtml(offer.coupon.code)}" aria-label="Copiar cupom ${escapeHtml(offer.coupon.code)}"><code>${escapeHtml(offer.coupon.code)}</code><span class="detail__coupon-copy">Copiar</span></button>`
+               : `<span class="detail__coupon-auto">Desconto já aplicado ao abrir no Mercado Livre.</span>`
+           }
+         </div>
+       </div>`
+    : "";
 
   const oldPrice =
     typeof offer.priceOld === "number" && offer.priceOld > offer.priceCurrent
@@ -96,6 +127,7 @@ export async function onRequestGet(context) {
             ${oldPrice}
             ${discount}
           </div>
+          ${couponHtml}
           <a class="btn btn--primary detail__cta" href="${link}" target="_blank" rel="noopener nofollow sponsored">
             Aproveitar no Mercado Livre
           </a>

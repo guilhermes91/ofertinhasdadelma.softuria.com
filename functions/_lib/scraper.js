@@ -16,6 +16,9 @@ export async function scrapeOffer(rawUrl, env) {
 
   const { html, finalUrl } = await fetchHtml(url);
   const raw = extractFromHtml(html);
+  // Cupom do ML: hoje o desconto vem via campanha aplicada no link (coupon_campaign_id),
+  // não um código digitável (raro no ML). Captura o que existe, sem inventar código.
+  const coupon = extractCoupon(finalUrl, html, rawUrl);
   // id do produto: prioriza a URL final (PDP/anúncio direto), cai pro 1º MLB do HTML.
   // Funciona pros DOIS tipos de link: direto (mlId vem da URL) e de afiliado
   // (meli.la → /social/<tag>?ref=...), onde o produto fixado pelo `ref` é o 1º MLB
@@ -52,10 +55,21 @@ export async function scrapeOffer(rawUrl, env) {
       : [],
     bestseller: !!raw.bestseller,
     isNew: true,
+    coupon,
     seller: "Mercado Livre"
   };
 
   return merged;
+}
+
+// Extrai cupom do link/HTML do Mercado Livre. O ML aplica desconto por CAMPANHA
+// (coupon_campaign_id no link), não por código digitável — então capturamos o
+// campaignId quando existe e deixamos `code` nulo (não inventamos código).
+function extractCoupon(finalUrl, html, rawUrl) {
+  const hay = `${finalUrl || ""} ${rawUrl || ""} ${html || ""}`;
+  const cid = (hay.match(/coupon_campaign_id=(\d{4,})/i) || [])[1];
+  if (!cid) return null;
+  return { code: null, text: "Cupom aplicado no Mercado Livre", campaignId: cid, source: "mercadolivre" };
 }
 
 function normalizeUrl(value) {
@@ -95,14 +109,19 @@ function extractFromHtml(html) {
   let discount = null;
   let bestseller = false;
   if (start !== -1) {
-    const block = html.slice(start, start + 8000);
+    // Recorta SÓ o card destacado: do 1º poly-card até o INÍCIO do 2º. O slice fixo
+    // de 8000 chars invadia o card seguinte e o menu/aba "Mais vendidos" do ML →
+    // bestseller virava falso-positivo ("quase sempre mais vendido"). Ver War Room 2026-05-30.
+    const next = html.indexOf("poly-card poly-card--list", start + 30);
+    const block = html.slice(start, next === -1 ? start + 4000 : next);
     const prevLabel = (block.match(/<s[^>]*andes-money-amount--previous[^>]*aria-label="([^"]+)"/i) || [])[1];
     const curLabel = (block.match(/poly-price__current[\s\S]*?aria-label="([^"]+)"/i) || [])[1];
     priceOld = parseAriaPrice(prevLabel);
     priceCurrent = parseAriaPrice(curLabel);
     const dm = block.match(/poly-price__disc[^>]*>\s*([0-9]+)\s*%\s*OFF/i);
     if (dm) discount = parseInt(dm[1], 10);
-    bestseller = /MAIS\s+VENDIDO/i.test(block);
+    // Badge REAL do produto (span de highlight), não a aba/menu nem JSON de config.
+    bestseller = /poly-component__highlight[^>]*>\s*MAIS\s+VENDIDO/i.test(block);
   }
 
   if (priceCurrent == null) {
@@ -223,7 +242,7 @@ function buildPrompt(raw, url) {
     '  "seoTitle": string  // até 70 chars, com a palavra-chave principal do produto',
     '  "seoDescription": string  // até 160 chars, foco em benefício + preço bom + Mercado Livre, de forma natural',
     '  "imageAlt": string  // descrição objetiva do produto, sem marketing',
-    '  "tags": string[]  // 3 a 5 tags em kebab-case, sem acentos, focadas no produto/categoria/uso (ex: "moda-infantil", "ferramentas", "casa")',
+    '  "tags": string[]  // 2 a 4 tags em kebab-case, sem acentos. A 1ª é a CATEGORIA ampla e navegavel (ex: "smart-tv", "ferramentas", "moda-infantil"); a 2ª, se houver marca clara, e CATEGORIA-MARCA (ex: "tv-philips", "fone-jbl"). Evite tags de 1 produto so (modelo especifico) e evite a palavra "mercado-livre".',
     "}"
   ].join("\n");
 }

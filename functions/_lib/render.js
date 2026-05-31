@@ -73,7 +73,9 @@ export function layout({
   const safeDesc = escapeHtml(description || SITE.description);
   const url = canonical.startsWith("http") ? canonical : `${SITE.origin}${canonical}`;
   const og = ogImage || `${SITE.origin}/og-cover.svg`;
-  const tags = tagCounts(offers).slice(0, 5);
+  // Só categorias com ≥2 ofertas viram chip "Em alta": tag de 1 item = página thin
+  // que o Google rebaixa (e chip que leva a quase-nada). Ver War Room 2026-05-30.
+  const tags = tagCounts(offers).filter((t) => t.count >= 2).slice(0, 5);
   const orgLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -116,7 +118,7 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="preconnect" href="https://http2.mlstatic.com" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=20260530a" />
+  <link rel="stylesheet" href="/styles.css?v=20260530b" />
   ${ldBlocks}
 </head>
 <body>
@@ -201,6 +203,19 @@ export function footer() {
   `;
 }
 
+// Marca de estado do card, por prioridade. Cada uma sustentada por dado real:
+// cupom (campo coupon) > mais vendido (badge real do ML) > novidade (< 24h). Senão,
+// nada (o card fica com o %OFF, ou limpo) — honesto, sem o "sempre mais vendido".
+function pickStateBadge(offer) {
+  if (offer.coupon && (offer.coupon.code || offer.coupon.campaignId)) {
+    return { label: "Cupom", kind: "coupon" };
+  }
+  if (offer.bestseller) return { label: "Mais vendido", kind: "bestseller" };
+  const ageH = (Date.now() - new Date(offer.addedAt || 0).getTime()) / 3600000;
+  if (ageH >= 0 && ageH < 24) return { label: "Novidade", kind: "new" };
+  return null;
+}
+
 export function offerCard(offer) {
   const url = safeUrl(offer.link) || "#";
   const detail = `/oferta/${escapeHtml(offer.slug)}/`;
@@ -209,10 +224,11 @@ export function offerCard(offer) {
     offer.discount && offer.discount >= 5
       ? `<span class="offer-card__badge">${offer.discount}% OFF</span>`
       : "";
-  const tag = offer.bestseller
-    ? `<span class="offer-card__tag offer-card__tag--bestseller">Mais vendido</span>`
-    : offer.isNew
-    ? `<span class="offer-card__tag offer-card__tag--new">Novidade</span>`
+  // Selo de estado: UMA marca por prioridade (não empilha). Diversidade real vinda do
+  // dado — cupom, mais-vendido REAL (após o fix do falso-positivo) ou novidade recente.
+  const state = pickStateBadge(offer);
+  const tag = state
+    ? `<span class="offer-card__tag offer-card__tag--${state.kind}">${state.label}</span>`
     : "";
   const img = safeUrl(offer.image);
   const oldPrice =

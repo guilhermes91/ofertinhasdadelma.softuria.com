@@ -11,7 +11,8 @@ export async function onRequestGet(context) {
     { loc: `${SITE.origin}/captar`, lastmod: today, changefreq: "monthly", priority: "0.3" }
   ];
 
-  for (const t of tags) {
+  // Só indexa tag com ≥2 ofertas: página de 1 item é thin-content (soft-404 no Google).
+  for (const t of tags.filter((t) => t.count >= 2)) {
     urls.push({
       loc: `${SITE.origin}/tag/${encodeURIComponent(t.slug)}/`,
       lastmod: today,

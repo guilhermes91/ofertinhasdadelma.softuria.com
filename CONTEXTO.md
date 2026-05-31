@@ -165,10 +165,15 @@ justamente aí, nas mudanças de Bot Fight Mode / token / DNS.)*
 2. ✅ **Limpeza "Monitor Philips":** **NADA a remover** — verificado em produção (2026-05-30): é
    captura legítima (R$ 389,90, imagem, `mlId`), e o `meli.la` resolve pra **nossa tag** `sade9179546`.
    Bônus: **42/42 ofertas com nosso link, 0 sem comissão** (catálogo 100% monetizado agora).
-3. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
-4. **Search Console + GA4** — medir e indexar. Ver playbook §2.
-5. **Redesign visual** do que ficou "confuso" — rodada com prints.
-6. **Backlink/Digital PR** — execução humana. Ver playbook §4.
+3. ✅ **Tags/badges/cupom (War Room 2026-05-30, §6.9):** badge falso-positivo corrigido, cascata de
+   badges, tags híbridas + guard anti-thin, cupom (campo+UI). **No ar.**
+4. ⏸️ **Fonte Promobit** (2–3 saltos, teto baixo) — próxima peça de scrape. **Pelando produto: inviável** (§6.9).
+5. 🔴 **EC2 on-demand (§6.9):** código do fluxo A+D pronto; **bloqueado por setup do dono** (OIDC
+   GitHub→AWS, IAM mínima, fechar porta 8000). Não-negociável: OIDC, não access key (repo público).
+6. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
+7. **Search Console + GA4** — medir e indexar. Ver playbook §2.
+8. **Redesign visual** do que ficou "confuso" — rodada com prints.
+9. **Backlink/Digital PR** — execução humana. Ver playbook §4.
 
 ---
 
@@ -310,6 +315,46 @@ depois), **auto-publicar** + manter captação pública por usuário. Cron a cad
 Monetização **resolvida**: a captura cai pra URL de produto limpa e a tag nossa entra via relink/API
 externa (ver §6.6/§6.7). Pausar o cron = comentar o `schedule`. Histórico do bloqueio por Bot Fight
 Mode e o fix estão em §5 (WS3).
+
+### 6.9 War Room "qualidade do feed" — tags, badges, cupom, fontes, EC2  (2026-05-30)
+
+Convocado de verdade (§3.1): 3 sub-agentes reais (SEO/Front · Edge/scrape · Infra CF×AWS), com
+**evidência de fetch** (os de scrape provaram, não opinaram). Pedidos do dono nesta rodada:
+melhorar tags, diversificar badges, incluir Promobit+Pelando, destacar cupom, EC2 on-demand.
+
+**✅ FEITO nesta sessão (provado, contido, testado — smoke OK + scraper real):**
+- **Badge "quase sempre mais vendido" = bug confirmado e corrigido.** O `bestseller` vinha de um
+  `/MAIS VENDIDO/` sobre fatia de **8000 chars** que invadia o 2º card e a aba "Mais vendidos" do
+  menu → falso-positivo. Fix: recorta só até o 2º `poly-card` e exige `poly-component__highlight>MAIS
+  VENDIDO` (`scraper.js`). Validado contra HTML real (Philips → `bestseller:false`).
+- **Cascata de badges** (`render.js` `pickStateBadge`): UMA marca por prioridade **Cupom > Mais
+  vendido (real) > Novidade (<24h)**; senão nada. Matou o `isNew:true` perpétuo. Diversidade vinda do dado.
+- **Tags híbridas (resposta à pergunta do dono: SEPARAR responsabilidades).** Os 5 papéis como
+  *página* dariam thin-content (`#mercadolivre` em 100% = duplicada; `#modelo` = 1 item = soft-404).
+  Decisão: `tags[]` segue plano e navegável **só com categoria/marca**; campos **derivados por
+  código** `store` (sempre `mercado-livre`) e `model` (extraído do título) viram **hashtags de
+  descoberta que linkam pra BUSCA**, não pra `/tag`. Na página da oferta o dono vê o cluster de 5
+  hashtags (#MercadoLivre #Cupom #categoria #marca #modelo); card mantém chips de categoria. Prompt
+  do Gemini enviesado p/ categoria+marca. **Guard anti-thin:** sitemap e "Em alta" só listam tag com
+  **≥2 ofertas** (`tagCounts().filter(count>=2)`). Convive com as 42 ofertas antigas sem migração.
+- **Cupom (não existia).** Campo `coupon{code,text,campaignId,source}` em `ensureOffer`. Selo "Cupom"
+  no card + **bloco copiável** na página da oferta (`client.js` copy c/ fallback). **Honesto:** o ML
+  aplica desconto por **campanha no link** (`coupon_campaign_id`), código digitável é raro → capturamos
+  o `campaignId` quando existe; sem inventar código. `priceValidUntil` reduzido 14→3 dias (schema não mente preço).
+
+**⏸️ DECIDIDO mas ADIADO (reportado fielmente):**
+- **Pelando como fonte de PRODUTO: inviável server-side** (feed é Astro/client-side, confirmado por
+  fetch). A única rota server-side é a página de **cupons**, que devolve links de **campanha**
+  (`lista.mercadolivre.com.br/_Container_…`), não produtos → não rende oferta publicável. Fica como
+  possível "feed de cupons" futuro, não como fonte do bot.
+- **Promobit: viável só com 2–3 saltos** (loja → /oferta → interstitial `/Redirect/to` onde o `meli.la`
+  está no HTML), e só ~3/10 ofertas têm o redirect inline. Frágil/caro (Ferrari). Próxima peça focada,
+  com teto baixo de ofertas/execução.
+- **EC2 on-demand:** caminho **A+D** — `relink.yml` liga→`wait`→`/health`→relinka→`stop` (`if:always`,
+  `concurrency`), disparado pelo `bot.yml` quando `added+refreshed>0`; auto-shutdown interno como
+  backstop. **🔴 Exige setup do dono:** OIDC GitHub→AWS (NÃO access key num repo público), IAM mínima
+  (start/stop por ARN da `i-0f7e171903f5c4398`), fechar porta 8000 / auth na API. Código pronto pra
+  entrar quando o OIDC existir.
 
 ---
 

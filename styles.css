@@ -290,6 +290,7 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 }
 .offer-card__tag--bestseller { background: var(--accent); color: #fff; }
 .offer-card__tag--new { background: var(--success); color: #fff; }
+.offer-card__tag--coupon { background: #6d28d9; color: #fff; } /* cupom = roxo, destaca do %OFF e do mais-vendido */
 
 .offer-card__body { padding: 14px 4px 4px; display: flex; flex-direction: column; flex-grow: 1; }
 .offer-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -465,6 +466,18 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .detail__discount { background: var(--primary); color: #fff; padding: 6px 12px; border-radius: var(--radius-pill); font-weight: 700; font-size: .85rem; }
 .detail__cta { width: 100%; max-width: 360px; padding: 16px 28px; font-size: 1.05rem; }
 .detail__legal { font-size: .85rem; color: var(--muted); margin: 10px 0 22px; }
+.detail__coupon { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; padding: 14px 16px; border: 1px dashed #6d28d9; background: #f5f3ff; border-radius: var(--radius-md, 12px); }
+.detail__coupon-icon { font-size: 1.5rem; line-height: 1; }
+.detail__coupon-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.detail__coupon-text { font-weight: 700; color: #4c1d95; font-size: .95rem; }
+.detail__coupon-code { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; cursor: pointer; background: #fff; border: 1px solid #6d28d9; border-radius: var(--radius-pill); padding: 6px 12px; }
+.detail__coupon-code code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; color: #4c1d95; }
+.detail__coupon-code .detail__coupon-copy { font-size: .78rem; font-weight: 700; color: #6d28d9; text-transform: uppercase; letter-spacing: .03em; }
+.detail__coupon-code.is-copied { background: #6d28d9; }
+.detail__coupon-code.is-copied code, .detail__coupon-code.is-copied .detail__coupon-copy { color: #fff; }
+.detail__coupon-auto { font-size: .85rem; color: var(--muted); }
+.taglink--store, .taglink--model { background: var(--primary-soft); }
+.taglink--coupon { border-color: #6d28d9; color: #4c1d95; background: #f5f3ff; }
 .detail__tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); margin: 18px 0; }
 .detail__tags > span { color: var(--muted); font-size: .85rem; font-weight: 600; }
 .detail__bullets { list-style: none; padding: 0; margin: 0; }

@@ -32,6 +32,42 @@
       .catch(function () { btn.textContent = original; btn.disabled = false; });
   });
 
+  // Copiar cupom (clipboard com fallback execCommand)
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest("[data-coupon]");
+    if (!btn) return;
+    var code = btn.getAttribute("data-coupon");
+    if (!code) return;
+    var label = btn.querySelector(".detail__coupon-copy");
+    var done = function () {
+      if (label) label.textContent = "Copiado!";
+      btn.classList.add("is-copied");
+      setTimeout(function () {
+        if (label) label.textContent = "Copiar";
+        btn.classList.remove("is-copied");
+      }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(function () { fallbackCopy(code); done(); });
+    } else {
+      fallbackCopy(code);
+      done();
+    }
+  });
+  function fallbackCopy(text) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch (_) {}
+  }
+
   // Smooth scroll for hash links
   document.querySelectorAll('a[href^="#"]').forEach(function (a) {
     a.addEventListener("click", function (e) {

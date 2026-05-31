@@ -89,9 +89,49 @@ export function ensureOffer(offer) {
     sourceUrl: stringOrEmpty(o.sourceUrl),
     reports: Math.max(0, parseInt(o.reports, 10) || 0),
     tags,
+    // Campos derivados por CÓDIGO (sem IA): metadados/hashtags de descoberta que NÃO
+    // viram página de tag indexável (evita thin-content). store = sempre ML; model =
+    // modelo extraído do título. Linkam pra BUSCA, não pra /tag.
+    store: stringOrEmpty(o.store) || "mercado-livre",
+    model: stringOrEmpty(o.model) || extractModel(o.title),
+    coupon: normalizeCoupon(o.coupon),
     bestseller: !!o.bestseller,
     isNew: o.isNew !== false,
     seller: stringOrEmpty(o.seller) || "Mercado Livre"
+  };
+}
+
+// Modelo do produto a partir do título, por heurística (sem IA): token alfanumérico
+// com pelo menos 1 dígito, 3-14 chars (ex: "221V8LBW3", "PH4200HD", "A52s"). Usado só
+// como hashtag/metadado de descoberta (link pra busca) — nunca cria URL indexável, então
+// um falso-positivo é cosmético.
+export function extractModel(title) {
+  const tokens = String(title || "").split(/[^A-Za-z0-9]+/).filter(Boolean);
+  // unidade/medida (não é modelo): "120hz", "24000dpi", "500gb", "55pol"...
+  const UNIT = /^\d+(hz|ms|w|v|cm|mm|kg|g|gb|tb|mah|ml|l|pol|k|p|dpi|fps|hd)$/i;
+  for (const tok of tokens) {
+    if (tok.length < 5 || tok.length > 14) continue;
+    const letters = (tok.match(/[A-Za-z]/g) || []).length;
+    const digits = (tok.match(/\d/g) || []).length;
+    // modelo = mistura de letras E números (ex: "221V8LBW3", "PH4200HD"), não medida
+    if (letters >= 2 && digits >= 1 && !UNIT.test(tok)) return slugify(tok);
+  }
+  return "";
+}
+
+// Cupom normalizado. O ML aplica desconto por campanha (campaignId) e raramente expõe
+// código digitável — então aceitamos {code?, text, campaignId?} e só consideramos cupom
+// quando há código OU campanha real. Nada inventado.
+export function normalizeCoupon(c) {
+  if (!c || typeof c !== "object") return null;
+  const code = c.code ? String(c.code).trim().toUpperCase().slice(0, 24) : null;
+  const campaignId = c.campaignId ? String(c.campaignId).trim().slice(0, 24) : null;
+  if (!code && !campaignId) return null;
+  return {
+    code: code || null,
+    text: stringOrEmpty(c.text) || "Cupom de desconto",
+    campaignId: campaignId || null,
+    source: stringOrEmpty(c.source) || "mercadolivre"
   };
 }
 
