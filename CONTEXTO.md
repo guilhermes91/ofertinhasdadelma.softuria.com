@@ -361,6 +361,20 @@ apontou as URLs certas. **Correção honesta:** na 6.9 dei "Pelando inviável" t
   `string` → `{url, coupon}`** — `discoverMlOffers` normaliza/dedup por url, `bot.js` propaga o cupom
   (prefere o código digitável da fonte ao `campaignId` do ML). Validado: 62 candidatos, 8 com cupom.
 
+### 6.9.4 Preço/cupom da FONTE + campos manuais  ✅ (2026-05-31)
+
+Bug (achado pelo dono): oferta com **preço errado** (Aiwa R$1269 vs R$1167,48 real) e **sem o cupom**
+(MEGACUPOM). Causa: líamos o preço do **card `/social` do ML** (diverge do deal) e o campo de cupom
+errado. **Pechinchou/Promobit expõem no `__NEXT_DATA__` o preço curado + cupom real** — na pechinchou
+o campo certo é **`coupons` (array)**, não `coupon` (que é a tag da loja). **Fix:** `crawlPechinchou`
+parseia `__NEXT_DATA__` → `{url, price, priceOld, coupon}`; `crawlPromobit` carrega price; candidato
+virou `{url, coupon?, price?, priceOld?}`. `bot.js`: preço da fonte é autoritativo na captura **e**
+uma **correção barata (sem scrape)** conserta ofertas já gravadas casando por `sourceUrl` (`corrected`).
+`/captar` ganhou **campos manuais opcionais de preço e cupom** (autoritativos; vazio = automático) —
+captura auto de cupom é best-effort. Validado em prod: Aiwa→R$1167,48 +MEGACUPOM (visível na página),
++Projetor +Bicicleta. **Pendente (ideia do dono):** "chamariz" de cupom com lista dos últimos N produtos
+— depende da API externa (atualizada p/ listas) + EC2.
+
 ### 6.9.3 Bot dedup — bug "não republicava ofertas novas"  ✅ CORRIGIDO (2026-05-31)
 
 O filtro pré-scrape comparava a URL do candidato (`meli.la`/`dpl`) com o `link` salvo (URL limpa
