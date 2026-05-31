@@ -157,23 +157,20 @@ justamente aí, nas mudanças de Bot Fight Mode / token / DNS.)*
 - Plano off-site + TODOs + como armar o bot: **`docs/SEO-PLAYBOOK.md`**.
 
 ### Próximos passos / open loops
-1. ✅ **War Room Segurança+Infra RODOU (2026-05-30)** — §3.1 de verdade, 3 sub-agentes reais e
-   independentes (Segurança/Deploy maker · Red-team devil · Infra Cloudflare×AWS). Síntese e
-   **checklist de ações do dono** em §6.6.0. Parte autônoma (código) **FEITA**. **🔴 Resta o dono:**
-   rotacionar `CLOUDFLARE_API_TOKEN` (2 tokens, escopo mínimo), purgar a sessão ML do KV + trocar
-   senha ML, decidir BFM (deixar OFF documentado vs Cron Trigger), fechar a porta 8000 da EC2.
-2. ✅ **Limpeza "Monitor Philips":** **NADA a remover** — verificado em produção (2026-05-30): é
-   captura legítima (R$ 389,90, imagem, `mlId`), e o `meli.la` resolve pra **nossa tag** `sade9179546`.
-   Bônus: **42/42 ofertas com nosso link, 0 sem comissão** (catálogo 100% monetizado agora).
-3. ✅ **Tags/badges/cupom (War Room 2026-05-30, §6.9):** badge falso-positivo corrigido, cascata de
-   badges, tags híbridas + guard anti-thin, cupom (campo+UI). **No ar.**
-4. ✅ **Fonte Pelando `/recentes`** integrada e provada (§6.9.1). ⏸️ **Promobit** = próxima peça (multi-hop + cupom digitável).
-5. 🔴 **EC2 on-demand (§6.9):** código do fluxo A+D pronto; **bloqueado por setup do dono** (OIDC
-   GitHub→AWS, IAM mínima, fechar porta 8000). Não-negociável: OIDC, não access key (repo público).
-6. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
-7. **Search Console + GA4** — medir e indexar. Ver playbook §2.
-8. **Redesign visual** do que ficou "confuso" — rodada com prints.
-9. **Backlink/Digital PR** — execução humana. Ver playbook §4.
+1. ✅ **Tags/badges/cupom (§6.9):** badge falso-positivo corrigido + cascata; tags híbridas + guard
+   anti-thin; cupom (campo+UI). Catálogo recomputado via `/api/refresh` (§6.9.2). **No ar.**
+2. ✅ **Fontes Pelando `/recentes` + Promobit** integradas e provadas (§6.9.1). Foco ML; Shopee/Amazon
+   depois (o Pelando já expõe os dois — é só estender o filtro + scraper).
+3. ✅ **SEO on-page (§6.9.2):** canonical paginado + prev/next, hub `/categorias`, breadcrumb com
+   categoria, lastmod por tag. **No ar.**
+4. **OG image raster** (1200×630) — SVG não renderiza no WhatsApp (canal principal). Ver playbook §2.
+5. **Search Console + GA4** — medir e indexar. Ver playbook §2.
+6. **Redesign visual** do que ficou "confuso" — rodada com prints.
+7. **Backlink/Digital PR** — execução humana. Ver playbook §4.
+
+> **⏸️ STANDBY (por decisão do dono — só retomar se ele pedir, não citar proativamente):**
+> pendências de segurança/infra do War Room (§6.6.0) — rotação do `CLOUDFLARE_API_TOKEN`, sessão ML,
+> BFM — e a **EC2 on-demand** (§6.9, fluxo A+D pronto, bloqueado por setup AWS/OIDC do dono).
 
 ---
 
@@ -356,13 +353,26 @@ apontou as URLs certas. **Correção honesta:** na 6.9 dei "Pelando inviável" t
   LIMPO `produto.mercadolivre.com.br/MLB-` = compliant; `sourceUrl`=dpl pro relink). Em `portals.js`
   `crawlPelando` + entrou no `discoverMlOffers`. Custo: +1 fetch (o feed); resolução do redirect é o
   mesmo fetch do scrape (sem hop extra).
-- **⏸️ PROMOBIT `/promocoes/loja/mercado-livre/` — viável e RICO em cupom, próxima peça.** O
-  `__NEXT_DATA__` expõe server-side: preço (`offerPrice/offerOldPrice`) e **código de cupom DIGITÁVEL**
-  (`offerCoupon`, `couponCode` ex.: `MELIBELEZA`/`SOHOJE`, com `couponInstructions`/`couponUntil`) —
-  o que o ML cru não dá. Mas o link ML de cada oferta exige salto `/oferta/<slug>` → `/Redirect/to/<id>`
-  (interstitial com o `meli.la` no HTML). Implica **multi-hop + carregar o código do cupom** (muda o
-  contrato de candidato de `string[]` p/ `{url, coupon}`). Fica como peça focada — é onde o campo
-  `coupon.code` (já existente) ganha código de verdade.
+- **✅ PROMOBIT `/promocoes/loja/mercado-livre/` — INTEGRADO (no ar).** O `__NEXT_DATA__` expõe
+  server-side preço + **código de cupom DIGITÁVEL** (`offerCoupon` ex.: `SOHOJE`, `MELIBELEZA`). O link
+  ML de cada oferta sai do interstitial `/Redirect/to/<offerId>` (onde o `meli.la` está no HTML);
+  **~50% resolvem** server-side (as JS-only são puladas; as COM cupom resolvem bem). `crawlPromobit`
+  prioriza ofertas com cupom e tem teto de 8 interstitials/execução. **Contrato de candidato passou de
+  `string` → `{url, coupon}`** — `discoverMlOffers` normaliza/dedup por url, `bot.js` propaga o cupom
+  (prefere o código digitável da fonte ao `campaignId` do ML). Validado: 62 candidatos, 8 com cupom.
+
+### 6.9.2 Refresh do catálogo + SEO on-page  (2026-05-30)
+
+- **✅ `/api/refresh` (token-gated, isento de Basic Auth no `_middleware`).** Re-roda `ensureOffer` nas
+  ofertas gravadas: **zera o `bestseller` stale** (o scraper antigo dava falso-positivo — eram **40/42**),
+  re-deriva `store`/`model`, normaliza `coupon`. Sem rede/Gemini. Workflow `refresh.yml`. **Rodado em
+  prod:** 42 atualizadas, 40 bestseller falsos limpos, 3 com model. **Resultado visível:** badge do card
+  saiu de "Mais vendido em ~tudo" → 0 bestseller, 14 Novidade(<24h), resto sem selo. (Responde ao "não
+  vi mudança nas badges": o código estava no ar, mas a badge lê dado gravado; faltava recomputar.)
+- **✅ SEO on-page:** canonical **ciente de página** (self-ref) + `rel prev/next` em home e `/tag`
+  (sort fora do canonical); **hub `/categorias`** (lista tags ≥2 ofertas, internal linking, no sitemap,
+  link "Ver todas" no header); **breadcrumb com nível CATEGORIA** na página da oferta (visual + schema);
+  **lastmod real por tag** no sitemap. Guard anti-thin (≥2) já aplicado.
 - **EC2 on-demand:** caminho **A+D** — `relink.yml` liga→`wait`→`/health`→relinka→`stop` (`if:always`,
   `concurrency`), disparado pelo `bot.yml` quando `added+refreshed>0`; auto-shutdown interno como
   backstop. **🔴 Exige setup do dono:** OIDC GitHub→AWS (NÃO access key num repo público), IAM mínima
