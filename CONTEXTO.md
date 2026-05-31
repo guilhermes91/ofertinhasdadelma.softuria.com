@@ -361,6 +361,24 @@ apontou as URLs certas. **Correção honesta:** na 6.9 dei "Pelando inviável" t
   `string` → `{url, coupon}`** — `discoverMlOffers` normaliza/dedup por url, `bot.js` propaga o cupom
   (prefere o código digitável da fonte ao `campaignId` do ML). Validado: 62 candidatos, 8 com cupom.
 
+### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
+
+O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava
+ERRADO) e Pechinchou perdendo ofertas. War Room real (4 sub-agentes, 1 por fonte, com evidência de
+fetch). Achados e fix por fonte (em `functions/_lib/portals.js`, reescrito):
+- **Promotop** (WordPress/ReHub, HTML): cupom em `data-clipboard-text` + preço em `rh_regular_price`,
+  por `<article>`. Antes só pegávamos o link → **0 cupons; agora 22/30**. (ex.: MELIBELEZA, INVERNOMELI15.)
+- **Pechinchou**: a regex só casava `meli.la` mas eles usam **`mercadolivre.com/sec/` e `bit.ly`** p/
+  ML → perdíamos **~45%** (com cupom!). Agora filtra por **`store.slug`** (não por domínio) + fonte
+  extra `/lojas/mercado-livre`. 6 → **25 ofertas**. `scraper.js` aceita `bit.ly` (REDIRECTOR_HOSTS).
+- **Pelando** (Astro, estado entity-encoded): preço vem no **feed `/recentes`** (inline), cupom só na
+  página **`/d/<slug>`** (`couponCode`). Parser lê o feed (price+slug) + busca cupom em `/d/` (teto 4),
+  e **rejeita "APLICAR CUPOM DE 15%"** (não é código digitável). Validado SUPERCUPOM.
+- **Promobit**: "~50% resolvem" era folclore (curl sem `-L`); ~100% resolvem. Teto **4→6** (6 cupons/pág).
+- `bot.js`: preço da fonte aplicado **antes** do guard de "sem preço" (link de catálogo `/p/` vem sem
+  preço no ML, mas a fonte tem). `SCRAPE_BUDGET 12→10`. **Validado em prod:** 80 ofertas, **27 com cupom**
+  (Promotop 20 · Pechinchou 5 · Promobit 2), 29 corrigidas num run, hitLimit:false.
+
 ### 6.9.4 Preço/cupom da FONTE + campos manuais  ✅ (2026-05-31)
 
 Bug (achado pelo dono): oferta com **preço errado** (Aiwa R$1269 vs R$1167,48 real) e **sem o cupom**
