@@ -1,5 +1,5 @@
 import {
-  loadOffers,
+  loadPublicOffers,
   offersByTag,
   paginate,
   sortByDateDesc,
@@ -15,7 +15,7 @@ export async function onRequestGet(context) {
   const slug = slugify(params.slug);
   const page = parseInt(url.searchParams.get("page") || "1", 10) || 1;
 
-  const all = await loadOffers(env);
+  const all = await loadPublicOffers(env);
   const filtered = sortByDateDesc(offersByTag(all, slug));
   if (!filtered.length) return notFound("Categoria sem ofertas no momento.", all);
 

@@ -1,5 +1,5 @@
 import {
-  loadOffers,
+  loadPublicOffers,
   paginate,
   searchOffers,
   sortByDateDesc,
@@ -42,7 +42,7 @@ export async function onRequestGet(context) {
   const page = parseInt(url.searchParams.get("page") || "1", 10) || 1;
   const sort = url.searchParams.get("sort") || "recentes";
 
-  const all = sortByDateDesc(await loadOffers(env));
+  const all = sortByDateDesc(await loadPublicOffers(env));
   const filtered = sortOffers(searchOffers(all, q), sort);
   const view = paginate(filtered, page, 12);
   const tags = tagCounts(all).slice(0, 5);

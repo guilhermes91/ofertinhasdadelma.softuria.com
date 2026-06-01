@@ -1,10 +1,10 @@
-import { loadOffers, tagCounts, humanizeTag, escapeHtml } from "./_lib/data.js";
+import { loadPublicOffers, tagCounts, humanizeTag, escapeHtml } from "./_lib/data.js";
 import { layout, htmlResponse, SITE } from "./_lib/render.js";
 
 // Hub de categorias: lista todas as tags com ≥2 ofertas (thin-content fica de fora).
 // Dá ao Google e ao usuário um índice navegável de tudo — internal linking forte.
 export async function onRequestGet(context) {
-  const all = await loadOffers(context.env);
+  const all = await loadPublicOffers(context.env);
   const tags = tagCounts(all).filter((t) => t.count >= 2);
 
   const listHtml = tags.length

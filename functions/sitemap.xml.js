@@ -1,8 +1,8 @@
-import { loadOffers, sortByDateDesc, tagCounts, escapeHtml, safeUrl } from "./_lib/data.js";
+import { loadPublicOffers, sortByDateDesc, tagCounts, escapeHtml, safeUrl } from "./_lib/data.js";
 import { SITE } from "./_lib/render.js";
 
 export async function onRequestGet(context) {
-  const offers = sortByDateDesc(await loadOffers(context.env));
+  const offers = sortByDateDesc(await loadPublicOffers(context.env));
   const tags = tagCounts(offers);
   const today = new Date().toISOString().slice(0, 10);
 

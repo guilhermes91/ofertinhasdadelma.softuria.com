@@ -15,6 +15,8 @@ on:
 jobs:
   capturar:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write   # pra disparar o relink.yml após capturar
     steps:
       - name: Disparar captação no /api/bot
         env:
@@ -40,4 +42,14 @@ jobs:
             echo "::error::Bot retornou HTTP $code (esperava 2xx). Veja o corpo acima."
             exit 1
           fi
+          # se entrou/mudou/corrigiu algo, sinaliza pra rodar o relink (gera nosso link
+          # -> a oferta passa a aparecer na vitrine, que só mostra ofertas com nosso link)
+          if [ "$(jq '((.added//0)+(.refreshed//0)+(.corrected//0))' resposta.json)" -gt 0 ]; then
+            echo "RELINK=1" >> "$GITHUB_ENV"
+          fi
           echo "Concluído."
+      - name: Disparar relink (monetiza as novas)
+        if: env.RELINK == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run relink.yml || echo "::warning::não consegui disparar o relink (segue no cron)."

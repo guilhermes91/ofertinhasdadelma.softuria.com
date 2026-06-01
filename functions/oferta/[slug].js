@@ -1,5 +1,5 @@
 import {
-  loadOffers,
+  loadPublicOffers,
   sortByDateDesc,
   escapeHtml,
   brl,
@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
   const { params, env } = context;
   const slug = String(params.slug || "").trim();
 
-  const all = await loadOffers(env);
+  const all = await loadPublicOffers(env);
   const offer = all.find((o) => o.slug === slug);
   if (!offer) return notFound("Essa oferta saiu do ar.", all);
 

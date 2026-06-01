@@ -12,6 +12,23 @@ export async function loadOffers(env) {
   }
 }
 
+// Nossa tag de afiliado (não é segredo; é a default do código).
+export const OUR_TAG = "sade9179546";
+
+// A oferta tem o NOSSO link de afiliado? (meli.la ou /social/<nossa-tag>). Só essas
+// devem aparecer na vitrine — URL limpa `produto.mercadolivre.com.br/MLB-` pode estar
+// quebrada (não vale pra produto de catálogo) e ainda não está monetizada.
+export function hasOurLink(offer) {
+  const l = String((offer && offer.link) || "").toLowerCase();
+  return /(?:^|\/\/)meli\.la\//.test(l) || l.includes("/social/" + OUR_TAG);
+}
+
+// Carregamento PÚBLICO: só ofertas com o nosso link (sem link bom = não aparece).
+// O bot/relink/admin usam loadOffers (catálogo inteiro).
+export async function loadPublicOffers(env) {
+  return (await loadOffers(env)).filter(hasOurLink);
+}
+
 export const MAX_OFFERS = 500;
 
 export async function saveOffers(env, offers) {
