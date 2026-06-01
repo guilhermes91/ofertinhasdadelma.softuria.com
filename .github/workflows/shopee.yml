@@ -1,0 +1,41 @@
+name: Bot Shopee (isolado do ML)
+
+# Captação automática da SHOPEE, em run SEPARADO do bot de ML — Shopee é lento
+# (~20s/item) e não pode dividir run com o ML (um item lento mataria a captura de ML).
+# Cron mais espaçado (Shopee é lento + volume baixo). Token-gated (BOT_TOKEN).
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: "Máx. de ofertas Shopee novas nesta execução"
+        required: false
+        default: "2"
+  schedule:
+    - cron: "7,37 * * * *"   # 2x por hora (espaçado; Shopee é lento)
+
+concurrency:
+  group: bot-shopee
+  cancel-in-progress: false
+
+jobs:
+  capturar-shopee:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar /api/shopee
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          MAX: ${{ github.event.inputs.max || '2' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BOT_TOKEN" ]; then echo "::error::Secret BOT_TOKEN não configurado."; exit 1; fi
+          echo "Captando Shopee (max=$MAX)..."
+          code=$(curl -sS -w '%{http_code}' -o resp.json --max-time 170 -X POST \
+            "https://ofertinhasdadelma.softuria.com/api/shopee?max=$MAX" \
+            -H "Authorization: Bearer $BOT_TOKEN" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+          echo "HTTP $code"; cat resp.json 2>/dev/null || true; echo ""
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Shopee retornou HTTP $code (esperava 2xx)."
+            exit 1
+          fi
+          echo "Concluído."

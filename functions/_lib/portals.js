@@ -185,6 +185,25 @@ function parsePelandoFeed(dec) {
   return out;
 }
 
+// Descoberta de candidatos SHOPEE no feed do Pelando (destinos shopee.com.br que o
+// crawlPelando ML descarta). Usado pelo fluxo Shopee ISOLADO (/api/shopee), NÃO pelo bot
+// de ML — Shopee é lento (~20s/item) e não pode dividir run com o ML.
+const SHOPEE_DEST_RE = /^https?:\/\/([a-z0-9.-]*\.)?shopee\.com\.br\//i;
+
+export async function discoverShopeeOffers(fetchImpl = fetch) {
+  let html;
+  try { html = await fetchHtml(PELANDO_SOURCES[0], fetchImpl); } catch (_) { return []; }
+  const dec = html.replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\\\//g, "/");
+  const out = new Set();
+  PELANDO_DPL_RE.lastIndex = 0;
+  let m;
+  while ((m = PELANDO_DPL_RE.exec(dec))) {
+    const dest = pelandoDest(m[1]);
+    if (dest && SHOPEE_DEST_RE.test(dest)) out.add(dest); // URL de produto Shopee (limpa p/ a API)
+  }
+  return [...out];
+}
+
 export async function crawlPelando(fetchImpl = fetch) {
   let html;
   try { html = await fetchHtml(PELANDO_SOURCES[0], fetchImpl); } catch (_) { return []; }

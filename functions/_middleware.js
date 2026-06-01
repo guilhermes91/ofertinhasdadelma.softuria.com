@@ -12,16 +12,17 @@ export async function onRequest(context) {
   const isApi = path.startsWith("/api/");
   const isScrape = path === "/api/scrape";
   const isBot = path === "/api/bot";
+  const isShopee = path === "/api/shopee";
   const isRelink = path === "/api/relink";
   const isRefresh = path === "/api/refresh";
   const isReport = path === "/api/report";
   const isWrite = isApi && !READ_METHODS.has(method);
 
-  // /captar, /api/bot, /api/relink, /api/refresh e /api/report são públicos de propósito:
-  // bot/relink/refresh têm token próprio (BOT_TOKEN); report é rate-limited por IP.
-  // /api/expire continua exigindo Basic Auth (admin).
+  // /captar, /api/bot, /api/shopee, /api/relink, /api/refresh e /api/report são públicos de
+  // propósito: bot/shopee/relink/refresh têm token próprio (BOT_TOKEN); report é rate-limited
+  // por IP. /api/expire continua exigindo Basic Auth (admin).
   const requiresAuth =
-    isAdminPage || isScrape || (isWrite && !isBot && !isRelink && !isRefresh && !isReport);
+    isAdminPage || isScrape || (isWrite && !isBot && !isShopee && !isRelink && !isRefresh && !isReport);
 
   if (requiresAuth && !checkBasicAuth(request, env)) {
     return unauthorized();

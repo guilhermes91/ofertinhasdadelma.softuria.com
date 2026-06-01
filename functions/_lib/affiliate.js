@@ -79,12 +79,12 @@ export async function generateAffiliate(productUrl, env) {
 // /completo: detalhes (nome/preço/imagem/descrição) + link de afiliado, numa chamada.
 // É o caminho confiável pro /captar — a API renderiza o produto direito (o edge não
 // consegue ler imagem/preço de alguns formatos de link do ML). Retorna objeto ou null.
-export async function completeOffer(productUrl, env) {
+export async function completeOffer(productUrl, env, timeoutMs = 120000) {
   if (!productUrl) return null;
   const { base, token } = await affConfig(env);
   if (!base) return null;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 120000); // Shopee leva ~20s; ML é rápido
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs); // Shopee ~20s; bot usa teto menor
   try {
     const res = await fetch(`${base}${COMPLETE_PATH}`, {
       method: "POST",
