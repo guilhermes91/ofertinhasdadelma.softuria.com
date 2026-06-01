@@ -38,6 +38,14 @@ function genUrlFromId(mlId) {
   return mlId ? `https://www.mercadolivre.com.br/p/${String(mlId).toUpperCase()}` : "";
 }
 
+// só meli.la / mercadolivre são aceitos pela API. O sourceUrl do Pelando é dpl.pelando
+// (redirecionador, não-ML) → pra essas a API precisa do /p/<mlId>.
+function apiUrlFor(o) {
+  const src = String(o.sourceUrl || "");
+  if (/\/\/(?:[^/]*\.)?(meli\.la|mercadolivre\.com)(?:\.br)?\//i.test(src)) return src;
+  return genUrlFromId(o.mlId);
+}
+
 function isOurAffiliateLink(link, tag) {
   const l = String(link || "").toLowerCase();
   return /(?:^|\/\/)meli\.la\//.test(l) || l.includes("/social/" + tag.toLowerCase());
@@ -80,7 +88,7 @@ async function run(context, method) {
   if (method === "GET" && url.searchParams.get("list") === "1") {
     const candidates = offers
       .filter((o) => !isOurAffiliateLink(o.link, tag))
-      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: o.sourceUrl || genUrlFromId(o.mlId) }))
+      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: apiUrlFor(o) }))
       .filter((c) => c.genUrl);
     return jsonResponse({ ok: true, total: offers.length, candidates });
   }

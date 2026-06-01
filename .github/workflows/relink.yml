@@ -56,22 +56,31 @@ jobs:
           echo "candidatos: $N"
           if [ "$N" -eq 0 ]; then echo "Nada a relinkar. Fim."; exit 0; fi
 
-          echo "== 3) gerar em lote via POST /afiliado (a partir do sourceUrl) =="
-          # lotes de 20 (limite da API). Aqui mandamos tudo de uma vez se N<=20; senão fatia.
-          jq '{urls: [.candidates[].genUrl]}' cand.json > batch_req.json
-          curl -fsS --max-time 240 -X POST "$API/afiliado" \
-            -H "Authorization: Bearer $AFF_TOKEN" -H "Content-Type: application/json" \
-            -d @batch_req.json -o gen.json
-          # envelope: { ok, resultados: [ { ok, short_url, erro } ] } — alinhado por índice
-          jq -n --slurpfile c cand.json --slurpfile g gen.json '
-            { updates: [ range(0; ($c[0].candidates | length)) as $i
-                | { id: $c[0].candidates[$i].id,
-                    link: (($g[0].resultados[$i] // {}) | select(.ok == true) | (.short_url // .affiliate_url // .long_url)) }
+          echo "== 3) gerar via POST /afiliado em lotes de 20 (limite da API) =="
+          jq -c '.candidates' cand.json > cands.json
+          echo '[]' > allres.json
+          off=0
+          while [ "$off" -lt "$N" ]; do
+            jq -c "{urls: [.[$off:$off+20][].genUrl]}" cands.json > batch_req.json
+            if curl -fsS --max-time 240 -X POST "$API/afiliado" \
+                 -H "Authorization: Bearer $AFF_TOKEN" -H "Content-Type: application/json" \
+                 -d @batch_req.json -o gen.json; then
+              jq -s '.[0] + (.[1].resultados // [])' allres.json gen.json > allres2.json && mv allres2.json allres.json
+            else
+              echo "::warning::lote $off falhou; segue."
+            fi
+            off=$((off + 20))
+          done
+          # envelope alinhado por índice ao candidato; só usa item com ok==true
+          jq -n --slurpfile c cands.json --slurpfile r allres.json '
+            { updates: [ range(0; ($c[0] | length)) as $i
+                | { id: $c[0][$i].id,
+                    link: (($r[0][$i] // {}) | select(.ok == true) | (.short_url // .affiliate_url // .long_url)) }
                 | select(.link != null) ] }' > updates.json
           U=$(jq '.updates | length' updates.json)
           echo "links gerados: $U de $N"
           echo "== falhas (item ok=false) =="
-          jq -r '.resultados[]? | select(.ok != true) | "\(.url // "?")  ERR=\(.erro // "?")"' gen.json | head -20 || true
+          jq -r '.[]? | select(.ok != true) | "\(.url // "?")  ERR=\(.erro // "?")"' allres.json | head -20 || true
 
           echo "== 4) aplicar no site =="
           code=$(curl -sS -w '%{http_code}' -o applied.json -X POST "$SITE/api/relink" \
