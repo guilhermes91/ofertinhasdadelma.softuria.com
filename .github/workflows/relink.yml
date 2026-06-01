@@ -12,8 +12,8 @@ on:
         description: 'Backfill sourceUrl: JSON [{"mlId":"...","sourceUrl":"https://meli.la/..."}]'
         required: false
         default: ""
-  schedule:
-    - cron: "23 */6 * * *" # monetiza o catálogo a cada ~6h (a API é hospedada, sempre on)
+  # Sem cron próprio: a geração do link roda LOGO APÓS a busca (bot.yml dispara este
+  # workflow quando captura algo). Único agendamento do projeto = a busca (bot, 10min).
 
 jobs:
   relink:
