@@ -3,6 +3,7 @@
 // de confirmação. Bloqueia spam por rate-limit simples por IP.
 
 import { scrapeOffer } from "./_lib/scraper.js";
+import { scrapeShopee, isShopeeUrl } from "./_lib/shopee.js";
 import {
   loadOffers,
   saveOffers,
@@ -50,13 +51,14 @@ async function handle(context, method) {
     return htmlResponse(renderForm({ message: "" }), { status: 200, cacheControl: "no-store" });
   }
   target = String(target).trim();
-  if (!isMercadoLivreUrl(target)) {
+  const isShopee = isShopeeUrl(target);
+  if (!isMercadoLivreUrl(target) && !isShopee) {
     return htmlResponse(
       renderForm({
         prefilled: target,
         prefilledCoupon: manualCoupon,
         prefilledPrice: manualPrice,
-        error: "O link precisa ser do Mercado Livre (meli.la, mercadolivre.com.br)."
+        error: "O link precisa ser do Mercado Livre (meli.la, mercadolivre.com.br) ou da Shopee (shopee.com.br)."
       }),
       { status: 400, cacheControl: "no-store" }
     );
@@ -83,7 +85,7 @@ async function handle(context, method) {
   }
 
   try {
-    const scraped = await scrapeOffer(target, env);
+    const scraped = isShopee ? await scrapeShopee(target, env) : await scrapeOffer(target, env);
     // Override manual (autoritativo): preço e cupom digitados ganham do scrape. Captura
     // automática de cupom é não-confiável (fontes às vezes expõem a tag da loja, não o
     // código real) — por isso o manual manda.
@@ -104,6 +106,26 @@ async function handle(context, method) {
             "Consegui abrir o link, mas não li o preço e a imagem do produto. Confira se é a página de um produto do Mercado Livre com preço visível e tente de novo."
         }),
         { status: 422, cacheControl: "no-store" }
+      );
+    }
+    // Modo preview (?dry=1): passou na guarda de qualidade, devolve o que SERIA publicado
+    // em JSON e NÃO grava. Serve pra validar a captação (inclusive Shopee) sem poluir a vitrine.
+    if (url.searchParams.get("dry")) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          dry: true,
+          source: isShopee ? "shopee" : "mercadolivre",
+          offer: {
+            title: scraped.title,
+            priceCurrent: scraped.priceCurrent,
+            image: scraped.image,
+            seller: scraped.seller,
+            tags: scraped.tags,
+            link: scraped.productUrl
+          }
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
       );
     }
     // Gera o NOSSO link de afiliado A PARTIR DO LINK COLADO (sourceUrl) — a API
@@ -134,7 +156,7 @@ function renderForm({ prefilled = "", prefilledCoupon = "", prefilledPrice = "",
       <div class="container hero__inner" style="max-width:700px;margin:0 auto;">
         <p class="hero__eyebrow"><span class="dot" aria-hidden="true"></span> Mande sua dica</p>
         <h1 class="hero__title">Achou um achadinho? <span class="hl">Cola aqui o link.</span></h1>
-        <p class="hero__sub">Cole um link do Mercado Livre que eu encaixo direitinho na vitrine. Demoro alguns segundos buscando os detalhes — espera só um instante.</p>
+        <p class="hero__sub">Cole um link do Mercado Livre ou da Shopee que eu encaixo direitinho na vitrine. Demoro alguns segundos buscando os detalhes — espera só um instante.</p>
         ${
           error
             ? `<p class="form-alert form-alert--error" role="alert">${escapeHtml(error)}</p>`
@@ -145,7 +167,7 @@ function renderForm({ prefilled = "", prefilledCoupon = "", prefilledPrice = "",
         <form class="capture-form" action="/captar" method="get">
           <label for="captar-url" class="visually-hidden">Link da oferta</label>
           <input id="captar-url" name="url" type="url" inputmode="url" required
-                 placeholder="https://meli.la/... ou https://www.mercadolivre.com.br/..."
+                 placeholder="https://meli.la/... · mercadolivre.com.br/... · shopee.com.br/..."
                  value="${escapeHtml(prefilled)}">
           <div class="capture-form__row">
             <input name="price" type="text" inputmode="decimal"
@@ -155,7 +177,7 @@ function renderForm({ prefilled = "", prefilledCoupon = "", prefilledPrice = "",
           </div>
           <button type="submit" class="btn btn--primary">Enviar oferta</button>
         </form>
-        <p class="capture-tip">Dica: cole o link de compartilhamento do Mercado Livre (começa com <code>meli.la/</code>). Preço e cupom são opcionais — se deixar em branco, eu busco sozinha.</p>
+        <p class="capture-tip">Dica: cole o link de compartilhamento do Mercado Livre (começa com <code>meli.la/</code>) ou o link do produto na <code>shopee.com.br</code>. Preço e cupom são opcionais — se deixar em branco, eu busco sozinha.</p>
       </div>
     </section>
   `;

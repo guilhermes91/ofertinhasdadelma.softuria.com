@@ -202,14 +202,14 @@ function fromCodePoint(cp) {
 
 // ----- Gemini -----
 
-async function enrichWithGemini(raw, url, env) {
+export async function enrichWithGemini(raw, url, env, store = "Mercado Livre") {
   if (!env.GEMINI_API_KEY) {
-    return fallbackEnrichment(raw);
+    return fallbackEnrichment(raw, store);
   }
-  const prompt = buildPrompt(raw, url);
+  const prompt = buildPrompt(raw, url, store);
   try {
     const out = await callGemini(prompt, env.GEMINI_API_KEY);
-    if (!out || typeof out !== "object") return fallbackEnrichment(raw);
+    if (!out || typeof out !== "object") return fallbackEnrichment(raw, store);
     return {
       title: clamp(out.title, 90) || raw.title,
       description: clamp(out.description, 180),
@@ -220,17 +220,17 @@ async function enrichWithGemini(raw, url, env) {
     };
   } catch (err) {
     console.error("Gemini error:", err && err.message);
-    return fallbackEnrichment(raw);
+    return fallbackEnrichment(raw, store);
   }
 }
 
-function fallbackEnrichment(raw) {
+function fallbackEnrichment(raw, store = "Mercado Livre") {
   return {
     title: raw.title,
     description: "Achadinho garimpado com carinho. Preço bom, vendedor confiável e link direto pra você comprar sem dor de cabeça.",
-    seoTitle: clamp(raw.title || "Oferta no Mercado Livre", 70),
+    seoTitle: clamp(raw.title || `Oferta na ${store}`, 70),
     seoDescription: clamp(
-      `${raw.title || "Achadinho da Delma"} com preço bom e link direto no Mercado Livre. Veja antes que acabe.`,
+      `${raw.title || "Achadinho da Delma"} com preço bom e link direto na ${store}. Veja antes que acabe.`,
       160
     ),
     imageAlt: clamp(raw.title, 130),
@@ -238,29 +238,32 @@ function fallbackEnrichment(raw) {
   };
 }
 
-function buildPrompt(raw, url) {
+function buildPrompt(raw, url, store = "Mercado Livre") {
   const priceLine =
     raw.priceCurrent != null
       ? `Preço atual: R$ ${raw.priceCurrent.toFixed(2)}${raw.priceOld ? ` (de R$ ${raw.priceOld.toFixed(2)})` : ""}.`
       : "Preço: não identificado.";
+  const descLine = raw.description ? `Descrição da loja: ${clamp(raw.description, 600)}` : "";
   return [
-    `Você é o copywriter da "${SITE.name}", um site de achadinhos curados do Mercado Livre com entrega para ${SITE.region}.`,
+    `Você é o copywriter da "${SITE.name}", um site de achadinhos curados com entrega para ${SITE.region}.`,
     "Tom: vizinha simpática, conversa fácil, português brasileiro coloquial, sem exageros, sem clickbait, sem palavras difíceis.",
     "Foco em conversão e SEO: use a palavra-chave principal do produto (marca/modelo/categoria) de forma natural no título e na descrição.",
-    "Você receberá os dados de uma oferta do Mercado Livre. Devolva apenas um JSON com os campos pedidos.",
+    `Você receberá os dados de uma oferta da ${store}. Devolva apenas um JSON com os campos pedidos.`,
     "",
     `URL: ${url}`,
+    `Loja: ${store}`,
     `Título original: ${raw.title || "(vazio)"}`,
     priceLine,
+    descLine,
     "",
     "Responda no formato JSON estrito (sem comentários, sem markdown), com este shape:",
     "{",
     '  "title": string  // 60-90 chars, claro, mantenha marca/quantidade quando relevantes',
     '  "description": string  // 1-2 frases, máximo 180 chars, foco em benefício e quem usa',
     '  "seoTitle": string  // até 70 chars, com a palavra-chave principal do produto',
-    '  "seoDescription": string  // até 160 chars, foco em benefício + preço bom + Mercado Livre, de forma natural',
+    `  "seoDescription": string  // até 160 chars, foco em benefício + preço bom + ${store}, de forma natural`,
     '  "imageAlt": string  // descrição objetiva do produto, sem marketing',
-    '  "tags": string[]  // 2 a 4 tags em kebab-case, sem acentos. A 1ª é a CATEGORIA ampla e navegavel (ex: "smart-tv", "ferramentas", "moda-infantil"); a 2ª, se houver marca clara, e CATEGORIA-MARCA (ex: "tv-philips", "fone-jbl"). Evite tags de 1 produto so (modelo especifico) e evite a palavra "mercado-livre".',
+    `  "tags": string[]  // 2 a 4 tags em kebab-case, sem acentos. A 1ª é a CATEGORIA ampla e navegavel (ex: "smart-tv", "ferramentas", "moda-infantil"); a 2ª, se houver marca clara, e CATEGORIA-MARCA (ex: "tv-philips", "fone-jbl"). Evite tags de 1 produto so (modelo especifico) e evite a palavra "${slugify(store)}".`,
     "}"
   ].join("\n");
 }
