@@ -92,6 +92,16 @@ async function run(context, method) {
     try { body = await request.json(); } catch { body = null; }
   }
 
+  // --- SET da config da API de afiliado no KV (pro edge/captar gerar link em tempo
+  // real SEM precisar setar env var no Cloudflare). Idempotente; chamado pelo relink.yml.
+  if (body && body.aff && typeof body.aff === "object") {
+    const u = String(body.aff.url || "").trim();
+    const t = String(body.aff.token || "").trim();
+    if (u) await env.OFFERS_KV.put("aff:url", u);
+    if (t) await env.OFFERS_KV.put("aff:token", t);
+    return jsonResponse({ ok: true, affSet: { url: !!u, token: !!t } });
+  }
+
   // --- SEED de sourceUrl (backfill de ofertas antigas, casa por mlId) ---
   if (body && Array.isArray(body.seed)) {
     let seeded = 0;

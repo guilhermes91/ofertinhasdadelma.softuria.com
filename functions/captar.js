@@ -2,7 +2,7 @@
 // Faz o scraping completo via Gemini, adiciona a oferta e mostra uma página
 // de confirmação. Bloqueia spam por rate-limit simples por IP.
 
-import { scrapeOffer } from "./_lib/scraper.js";
+import { scrapeOffer, enrichOffer } from "./_lib/scraper.js";
 import { scrapeShopee, isShopeeUrl } from "./_lib/shopee.js";
 import {
   loadOffers,
@@ -11,12 +11,13 @@ import {
   upsertOffer,
   slugify,
   uniqueSlug,
+  mlIdFromUrl,
   isMercadoLivreUrl,
   escapeHtml,
   brl
 } from "./_lib/data.js";
 import { layout, htmlResponse, SITE } from "./_lib/render.js";
-import { generateAffiliate } from "./_lib/affiliate.js";
+import { generateAffiliate, completeOffer } from "./_lib/affiliate.js";
 
 const RATE_LIMIT_SECONDS = 20;
 
@@ -85,7 +86,29 @@ async function handle(context, method) {
   }
 
   try {
-    const scraped = isShopee ? await scrapeShopee(target, env) : await scrapeOffer(target, env);
+    // Caminho preferido: API /completo (nome/preço/imagem + NOSSO link, numa chamada).
+    // É confiável pro ML E Shopee — o edge não lê imagem/preço de alguns formatos de link
+    // (ex.: produto.mercadolivre.com.br/MLB-...). Só ativa se a config da API existir (env/KV).
+    let scraped;
+    let apiLink = null;
+    const api = await completeOffer(target, env);
+    if (api && api.link && api.image) {
+      const mlId = mlIdFromUrl(target) || "";
+      const base = {
+        url: target,
+        raw: { title: api.name, image: api.image, priceCurrent: api.price, priceOld: null, discount: null, bestseller: false },
+        coupon: null,
+        mlId,
+        productUrl: mlId ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}` : target,
+        sourceUrl: target
+      };
+      scraped = await enrichOffer(base, env); // Gemini só pra copy (título/seo/tags)
+      scraped.image = api.image;
+      if (isShopee) scraped.seller = "Shopee";
+      apiLink = api.link; // NOSSO link de afiliado (já veio da API)
+    } else {
+      scraped = isShopee ? await scrapeShopee(target, env) : await scrapeOffer(target, env);
+    }
     // Override manual (autoritativo): preço e cupom digitados ganham do scrape. Captura
     // automática de cupom é não-confiável (fontes às vezes expõem a tag da loja, não o
     // código real) — por isso o manual manda.
@@ -132,7 +155,7 @@ async function handle(context, method) {
     // resolve o produto certo (a productUrl `produto/MLB-` dá erro 111 em catálogo).
     // ⚠️ COMPLIANCE: o link salvo NUNCA é o `target`/sourceUrl (tag da fonte); fallback
     // seguro = URL de produto LIMPA, sem tag nenhuma.
-    const aff = await generateAffiliate(scraped.sourceUrl || scraped.productUrl, env);
+    const aff = apiLink || (await generateAffiliate(scraped.sourceUrl || scraped.productUrl, env));
     const all = await loadOffers(env);
     const baseSlug = slugify(scraped.title || "oferta");
     const slug = uniqueSlug(baseSlug, all.map((o) => o.slug));
