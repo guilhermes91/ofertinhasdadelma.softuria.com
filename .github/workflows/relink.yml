@@ -56,12 +56,27 @@ jobs:
           echo "candidatos: $N"
           if [ "$N" -eq 0 ]; then echo "Nada a relinkar. Fim."; exit 0; fi
 
-          echo "== 3) gerar via POST /afiliado em lotes de 20 (limite da API) =="
           jq -c '.candidates' cand.json > cands.json
+
+          echo "== 3a) resolve cada link ao destino final (/social) — forma que a API aceita =="
+          # meli.la / mercadolivre.com/sec / bit.ly / dpl.pelando resolvem todos p/ /social?ref=;
+          # a API rejeita /sec, /p/<itemId> e produto/MLB-, mas aceita o /social resolvido.
+          jq -r '.candidates[].genUrl' cand.json > urls.txt
+          : > resolved.txt
+          while IFS= read -r u; do
+            f=$(curl -sS -A "$BUA" -L --max-time 30 -o /dev/null -w '%{url_effective}' "$u" 2>/dev/null || true)
+            echo "${f:-$u}" >> resolved.txt
+          done < urls.txt
+          jq -R -s 'split("\n") | map(select(. != ""))' resolved.txt > resolved.json
+          RN=$(jq 'length' resolved.json)
+          echo "resolvidas: $RN de $N"
+
+          echo "== 3b) gerar via POST /afiliado em lotes de 20 (limite da API) =="
           echo '[]' > allres.json
           off=0
-          while [ "$off" -lt "$N" ]; do
-            jq -c "{urls: [.[$off:$off+20][].genUrl]}" cands.json > batch_req.json
+          while [ "$off" -lt "$RN" ]; do
+            END=$((off + 20))
+            jq -c ".[$off:$END] | {urls: .}" resolved.json > batch_req.json
             if curl -fsS --max-time 240 -X POST "$API/afiliado" \
                  -H "Authorization: Bearer $AFF_TOKEN" -H "Content-Type: application/json" \
                  -d @batch_req.json -o gen.json; then
@@ -69,9 +84,9 @@ jobs:
             else
               echo "::warning::lote $off falhou; segue."
             fi
-            off=$((off + 20))
+            off=$END
           done
-          # envelope alinhado por índice ao candidato; só usa item com ok==true
+          # resultados alinhados por índice ao candidato; só usa item ok==true
           jq -n --slurpfile c cands.json --slurpfile r allres.json '
             { updates: [ range(0; ($c[0] | length)) as $i
                 | { id: $c[0][$i].id,

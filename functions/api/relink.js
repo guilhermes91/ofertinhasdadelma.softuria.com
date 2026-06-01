@@ -32,18 +32,12 @@ function productUrlFromId(mlId) {
   return mlId ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}` : "";
 }
 
-// URL p/ MANDAR pra API de afiliado. A API rejeita `produto.mercadolivre.com.br/MLB-`;
-// aceita `/p/<mlId>` (e o sourceUrl meli.la). Usada só como fallback quando não há sourceUrl.
+// URL "semente" p/ a API de afiliado. Pode ser qualquer redirecionador (meli.la,
+// mercadolivre.com/sec, bit.ly, dpl.pelando) — o relink.yml RESOLVE ao destino final
+// (/social/...?ref=) antes de mandar, que é a forma que a API aceita. Sem sourceUrl,
+// cai pro /p/<mlId> (a API rejeita produto.mercadolivre.com.br/MLB-).
 function genUrlFromId(mlId) {
   return mlId ? `https://www.mercadolivre.com.br/p/${String(mlId).toUpperCase()}` : "";
-}
-
-// só meli.la / mercadolivre são aceitos pela API. O sourceUrl do Pelando é dpl.pelando
-// (redirecionador, não-ML) → pra essas a API precisa do /p/<mlId>.
-function apiUrlFor(o) {
-  const src = String(o.sourceUrl || "");
-  if (/\/\/(?:[^/]*\.)?(meli\.la|mercadolivre\.com)(?:\.br)?\//i.test(src)) return src;
-  return genUrlFromId(o.mlId);
 }
 
 function isOurAffiliateLink(link, tag) {
@@ -88,7 +82,7 @@ async function run(context, method) {
   if (method === "GET" && url.searchParams.get("list") === "1") {
     const candidates = offers
       .filter((o) => !isOurAffiliateLink(o.link, tag))
-      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: apiUrlFor(o) }))
+      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: o.sourceUrl || genUrlFromId(o.mlId) }))
       .filter((c) => c.genUrl);
     return jsonResponse({ ok: true, total: offers.length, candidates });
   }
