@@ -59,7 +59,8 @@ async function run({ request, env }) {
   const seen = new Set(all.filter((o) => o.sourceUrl).map((o) => normalizeLink(o.sourceUrl)));
 
   const added = [];
-  const refreshed = [];
+  const refreshed = []; // bump pela regra (caiu de preço OU >48h)
+  const updated = [];   // dados corrigidos in-place, SEM bump
   const errors = [];
   let offers = all;
   let processed = 0;
@@ -110,15 +111,16 @@ async function run({ request, env }) {
     const slug = uniqueSlug(slugify(off.title || "oferta"), offers.map((o) => o.slug));
     // link = NOSSO an_redir (inline da API); store/seller Shopee. NÃO passa por relink.
     const candidate = ensureOffer({ ...off, slug, link: api.link, image: api.image, store: "shopee", seller: "Shopee" });
-    const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
+    const r = upsertOffer(offers, candidate, { repostRule: true });
     offers = r.offers;
     seen.add(normalizeLink(canonical));
     const info = { slug: r.offer.slug, title: r.offer.title, price: r.offer.priceCurrent };
     if (r.action === "added") added.push(info);
     else if (r.action === "refreshed") refreshed.push(info);
+    else if (r.action === "updated") updated.push(info);
   }
 
-  if (!dry && (added.length || refreshed.length)) {
+  if (!dry && (added.length || refreshed.length || updated.length)) {
     await saveOffers(env, offers);
   }
 
@@ -128,7 +130,9 @@ async function run({ request, env }) {
     candidates: candidates.length,
     processed,
     added: added.length,
-    refreshed: refreshed.length,
+    reposted: refreshed.length, // bump pela regra (caiu de preço OU >48h)
+    refreshed: refreshed.length, // alias histórico (compat)
+    updated: updated.length, // dados corrigidos in-place, SEM bump
     dry,
     items: added,
     errors

@@ -189,18 +189,50 @@ export function findDuplicateIndex(offers, incoming) {
   );
 }
 
+// Repost (bump = renovar addedAt + jogar pro topo) só vale em 2 casos: oferta com mais de
+// 48h de publicação, OU queda de preço MATERIAL (≥3% OU ≥R$5, o que vier primeiro). Fora
+// disso, atualiza os dados no lugar mas NÃO renova. Evita o "bump gratuito" de quem reaparece
+// na raspagem — e o threshold mata o ruído de centavos da fonte (que recriaria o spam).
+export const REPOST_MIN_AGE_MS = 48 * 60 * 60 * 1000;
+export const REPOST_MIN_DROP_FRAC = 0.03; // 3%
+export const REPOST_MIN_DROP_BRL = 5; // R$5
+export function shouldRepost(existing, newPrice) {
+  const addedMs = new Date((existing && existing.addedAt) || 0).getTime();
+  // addedAt ausente/inválido vira 0 ("1970") → idade gigante. Trata como RECENTE (não
+  // reposta por idade) em vez de bumpar tudo sem data — senão legado sem addedAt sobe sempre.
+  const ageOk = addedMs > 0 && Date.now() - addedMs > REPOST_MIN_AGE_MS;
+  const old = Number((existing && existing.priceCurrent) || 0);
+  const np = Number(newPrice);
+  // Queda só conta se for MATERIAL: ≥3% OU ≥R$5. Centavo de oscilação não passa.
+  const cheaper = np > 0 && old > 0 && (np <= old * (1 - REPOST_MIN_DROP_FRAC) || old - np >= REPOST_MIN_DROP_BRL);
+  return ageOk || cheaper;
+}
+
 // Insere ou atualiza ("repost"). Se já existe o mesmo produto, atualiza no lugar
-// — MANTÉM id/slug pra não quebrar URL/SEO — e (por padrão) joga pro topo com
-// addedAt novo. Retorna { offers, action: added|refreshed|skipped, offer }.
+// — MANTÉM id/slug pra não quebrar URL/SEO. Comportamento do bump:
+//  - repostRule:true → bumpa só se shouldRepost(existing, novoPreço) (regra do dono).
+//    Se não bumpa mas dados mudaram → grava in-place (action "updated", mantém addedAt
+//    e posição). Se nada mudou → "skipped".
+//  - senão (legado): bumpToTop fixo; onlyIfChanged pula quando preço não mudou.
+// Retorna { offers, action: added|refreshed|updated|skipped, offer }.
 export function upsertOffer(offers, incoming, opts = {}) {
-  const { bumpToTop = true, onlyIfChanged = false } = opts;
+  const { bumpToTop = true, onlyIfChanged = false, repostRule = false } = opts;
   const idx = findDuplicateIndex(offers, incoming);
   if (idx === -1) {
     return { offers: [incoming, ...offers], action: "added", offer: incoming };
   }
   const existing = offers[idx];
   const priceChanged = Number(existing.priceCurrent || 0) !== Number(incoming.priceCurrent || 0);
-  if (onlyIfChanged && !priceChanged) {
+  // Decide o bump. repostRule → pela regra do dono; senão → bumpToTop fixo (com onlyIfChanged).
+  const bump = repostRule ? shouldRepost(existing, incoming.priceCurrent) : bumpToTop;
+  const couponChanged =
+    JSON.stringify(existing.coupon || null) !== JSON.stringify(incoming.coupon || null);
+  if (!bump) {
+    // Sem bump: só grava in-place se houver mudança real (preço/cupom); senão não mexe.
+    if (!priceChanged && !couponChanged) {
+      return { offers, action: "skipped", offer: existing };
+    }
+  } else if (onlyIfChanged && !priceChanged && !repostRule) {
     return { offers, action: "skipped", offer: existing };
   }
   const refreshed = ensureOffer({
@@ -208,13 +240,12 @@ export function upsertOffer(offers, incoming, opts = {}) {
     ...incoming,
     id: existing.id,
     slug: existing.slug,
-    addedAt: bumpToTop ? new Date().toISOString() : existing.addedAt
+    addedAt: bump ? new Date().toISOString() : existing.addedAt
   });
-  const rest = offers.slice(0, idx).concat(offers.slice(idx + 1));
-  const nextOffers = bumpToTop
-    ? [refreshed, ...rest]
+  const nextOffers = bump
+    ? [refreshed, ...offers.slice(0, idx).concat(offers.slice(idx + 1))]
     : offers.slice(0, idx).concat([refreshed], offers.slice(idx + 1));
-  return { offers: nextOffers, action: "refreshed", offer: refreshed };
+  return { offers: nextOffers, action: bump ? "refreshed" : "updated", offer: refreshed };
 }
 
 // Remove ofertas "quebradas" (muitos reports) e/ou vencidas (idade). Por padrão só

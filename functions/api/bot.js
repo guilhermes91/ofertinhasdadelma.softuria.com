@@ -11,6 +11,7 @@ import {
   saveOffers,
   ensureOffer,
   upsertOffer,
+  shouldRepost,
   normalizeLink,
   slugify,
   uniqueSlug
@@ -105,14 +106,16 @@ async function run(context) {
   const byMlId = new Map(all.filter((o) => o.mlId).map((o) => [o.mlId, o]));
 
   const added = [];
-  const refreshed = [];
+  const refreshed = []; // bump (repost): caiu de preço OU >48h
+  const updated = [];   // dados corrigidos in-place, SEM bump
   const errors = [];
   let offers = all;
 
   // CORREÇÃO barata (sem scrape): fontes com PREÇO/CUPOM estruturado (pechinchou,
   // promobit) são autoritativas pro deal. Casa o candidato com a oferta já gravada por
-  // sourceUrl e corrige preço/cupom in-place — sem gastar fetch/Gemini.
-  let corrected = 0;
+  // sourceUrl. Regra do dono: só REPOSTA (bump = topo + addedAt novo) se preço caiu OU a
+  // oferta tem >48h; senão corrige in-place sem renovar. (Tudo sem fetch/Gemini.)
+  let corrected = 0; // alias histórico = updated + refreshed deste passe (compat)
   const bySource = new Map();
   for (const o of all) if (o.sourceUrl) bySource.set(normalizeLink(o.sourceUrl), o);
   for (const c of candidates) {
@@ -125,10 +128,28 @@ async function run(context) {
     const newCoupon = c.coupon && c.coupon.code ? c.coupon : o.coupon || null;
     const priceChanged = Number(o.priceCurrent || 0) !== newPrice;
     const couponChanged = JSON.stringify(o.coupon || null) !== JSON.stringify(newCoupon || null);
-    if (!priceChanged && !couponChanged) continue;
+    const repost = shouldRepost(o, newPrice); // caiu de preço OU >48h
+    // Nada mudou: só age se a regra mandar bumpar (caso >48h-preço-igual). Senão, segue.
+    if (!priceChanged && !couponChanged && !repost) continue;
     const idx = offers.findIndex((x) => x.id === o.id);
     if (idx === -1) continue;
-    offers[idx] = ensureOffer({ ...o, priceCurrent: newPrice, priceOld: newOld, discount: null, coupon: newCoupon });
+    const fixed = ensureOffer({
+      ...o,
+      priceCurrent: newPrice,
+      priceOld: newOld,
+      discount: null,
+      coupon: newCoupon,
+      addedAt: repost ? new Date().toISOString() : o.addedAt
+    });
+    const info = { slug: fixed.slug, title: fixed.title, price: fixed.priceCurrent };
+    if (repost) {
+      // bump: tira da posição atual e joga pro topo
+      offers = [fixed, ...offers.slice(0, idx).concat(offers.slice(idx + 1))];
+      refreshed.push(info);
+    } else {
+      offers[idx] = fixed; // in-place, mantém addedAt e posição
+      updated.push(info);
+    }
     corrected += 1;
   }
   let scraped = 0; // teto de fetch+extract por execução (bound de subrequests)
@@ -169,9 +190,40 @@ async function run(context) {
       errors.push({ link, reason: "título não-produto (lista/perfil)" });
       continue;
     }
-    // dedup por id do produto: já existe e preço igual → pula SEM gastar Gemini.
+    // dedup por id do produto. Regra do dono p/ repost (bump): só se preço caiu OU >48h.
     const dup = byMlId.get(base.mlId);
-    if (dup && Number(dup.priceCurrent || 0) === Number(base.raw.priceCurrent || 0)) continue;
+    if (dup) {
+      const newPrice = Number(base.raw.priceCurrent || 0);
+      const samePrice = Number(dup.priceCurrent || 0) === newPrice;
+      const repost = shouldRepost(dup, newPrice); // caiu OU >48h
+      if (!repost) {
+        // Sem direito a bump. Se o preço mudou (subiu, <48h), corrige in-place SEM Gemini
+        // (a copy antiga serve; preço é campo solto). Preço igual → não há nada a fazer.
+        if (!samePrice) {
+          const di = offers.findIndex((x) => x.id === dup.id);
+          if (di !== -1) {
+            const fixed = ensureOffer({ ...dup, priceCurrent: newPrice, priceOld: base.raw.priceOld, discount: null });
+            offers[di] = fixed; // in-place: mantém addedAt e posição
+            byMlId.set(base.mlId, fixed);
+            updated.push({ slug: fixed.slug, title: fixed.title, price: fixed.priceCurrent });
+          }
+        }
+        continue;
+      }
+      if (samePrice) {
+        // Caso (a): >48h, mesmo preço → BUMP BARATO (copy não mudou, 0 Gemini): renova
+        // addedAt e joga pro topo, sem reprocessar.
+        const di = offers.findIndex((x) => x.id === dup.id);
+        if (di !== -1) {
+          const bumped = ensureOffer({ ...dup, addedAt: new Date().toISOString() });
+          offers = [bumped, ...offers.slice(0, di).concat(offers.slice(di + 1))];
+          byMlId.set(base.mlId, bumped);
+          refreshed.push({ slug: bumped.slug, title: bumped.title, price: bumped.priceCurrent });
+        }
+        continue;
+      }
+      // Caso (b)/(a com preço novo): deal mudou e tem direito a bump → vale o Gemini.
+    }
 
     let scrapedOffer;
     try {
@@ -191,15 +243,16 @@ async function run(context) {
     // ⚠️ COMPLIANCE: NUNCA salvar o link da FONTE (tem a tag do concorrente); fallback = limpo.
     const ourLink = await generateAffiliate(base.finalUrl || scrapedOffer.sourceUrl, env);
     const candidate = ensureOffer({ ...scrapedOffer, slug, link: ourLink || scrapedOffer.productUrl, coupon, seller: "Mercado Livre" });
-    const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
+    const r = upsertOffer(offers, candidate, { repostRule: true });
     offers = r.offers;
     byMlId.set(candidate.mlId, r.offer); // não reprocessa o mesmo produto neste run
     const info = { slug: r.offer.slug, title: r.offer.title, price: r.offer.priceCurrent };
     if (r.action === "added") added.push(info);
     else if (r.action === "refreshed") refreshed.push(info);
+    else if (r.action === "updated") updated.push(info);
   }
 
-  if (!dry && (added.length || refreshed.length || corrected)) {
+  if (!dry && (added.length || refreshed.length || updated.length)) {
     await saveOffers(env, offers);
   }
 
@@ -211,12 +264,15 @@ async function run(context) {
     candidates: candidates.length,
     scraped,
     hitLimit,
-    corrected,
+    corrected, // compat: total tocado no passe de correção (= reposted+updated daquele passe)
     added: added.length,
-    refreshed: refreshed.length,
+    reposted: refreshed.length, // bump pela regra (caiu de preço OU >48h)
+    refreshed: refreshed.length, // alias histórico de `reposted` (compat com consumidores)
+    updated: updated.length, // dados corrigidos in-place, SEM bump
     dry,
     items: added,
     refreshedItems: refreshed,
+    updatedItems: updated,
     errors
   });
 }

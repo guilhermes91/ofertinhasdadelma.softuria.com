@@ -433,6 +433,32 @@ problema), não os limites de edge.
   que a 1ª cron disparou 200 com `added>0`. Furo do devil sobre BFM: **NÃO religar o Bot Fight Mode** —
   quebraria o fallback do GitHub.
 
+### 6.12 Regra de REPOST (anti-renovação gratuita)  ✅ (2026-06-01)
+
+**Problema:** o bot REPOSTAVA (bump = `addedAt` novo + topo) toda oferta que reaparecia na raspagem
+com QUALQUER mudança de preço (até subir/oscilar centavo). Pelando era o pior caso — link `dpl`
+efêmero nunca casa o dedup barato por URL → raspado todo run → bump. O dono via as mesmas ofertas
+"renovando" sem motivo.
+
+**Regra do dono:** só repostar (bump) em 2 casos — (a) a oferta tem **>48h** de `addedAt`, OU (b)
+**queda de preço MATERIAL**. Senão: atualiza os dados in-place SEM renovar (mantém `addedAt`/posição).
+
+- **`shouldRepost(existing, newPrice)`** em `data.js`: `idade>48h (REPOST_MIN_AGE_MS)` OU queda
+  `≥3% (REPOST_MIN_DROP_FRAC)` OU `≥R$5 (REPOST_MIN_DROP_BRL)`. **Threshold material** (decisão do
+  dono no War Room, contra o "menor literal"): centavo de oscilação da fonte recriaria o mesmo spam
+  (efeito catraca — devil FURO 8). Guard de `addedAt` ausente/0 → trata como RECENTE (não bumpa por
+  idade; senão legado sem data subiria sempre — devil FURO 7).
+- **`upsertOffer`** ganhou `repostRule:true`: quando acha duplicado, decide o bump por `shouldRepost`
+  em vez de `bumpToTop` fixo. `action`: `refreshed` (bump) | `updated` (in-place, sem bump) | `skipped`.
+- **`bot.js`** aplica nos 2 caminhos: passe de correção barato (sourceUrl, sem fetch) e laço principal.
+  Caso **>48h + preço igual** = bump BARATO (renova `addedAt`, 0 Gemini). Caso **subiu/queda imaterial**
+  = corrige in-place sem Gemini. Caso **queda material/48h c/ preço novo** = vale o enrich+upsert. Response
+  expõe `reposted`/`updated`/`added`.
+- **`shopee.js`** usa a MESMA regra (`repostRule:true`). **`captar.js` NÃO** — post manual do dono é
+  intencional → `bumpToTop:true` sempre (devil FURO 6).
+- Validado: 12 casos-limite de `shouldRepost` (centavo→não; 3%/R$5/48h→sim; subiu/igual/sem-data→não).
+  War Room (maker + devil); o devil mudou a regra (threshold material em vez de "menor literal").
+
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
 O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava
