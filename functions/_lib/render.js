@@ -9,7 +9,7 @@ export const SITE = {
   // SEO em modo local sem mexer em mais nenhum arquivo.
   region: "todo o Brasil",
   description:
-    "Achadinhos do Mercado Livre garimpados com carinho. Preço bom, link direto e curadoria diária, com entrega pra todo o Brasil.",
+    "Achadinhos da internet garimpados com carinho — das melhores lojas (Mercado Livre, Shopee, Amazon e mais). Preço bom, link direto e curadoria diária pra todo o Brasil.",
   // Link do grupo/contato no WhatsApp (canal principal). Vazio = barra do topo escondida.
   // TODO: trocar "#placeholder" pelo link real do grupo (ex.: https://chat.whatsapp.com/XXXX).
   whatsapp: "#placeholder",
@@ -202,7 +202,14 @@ export function footer() {
           <a href="https://softuria.com" target="_blank" rel="noopener noreferrer">Softuria</a>
         </p>
         <p class="site-footer__legal">
-          Os links de oferta podem ser de afiliado. O preço final e a disponibilidade são definidos pela loja parceira no momento da compra.
+          <strong>Aviso de responsabilidade.</strong> As ofertas são curadas de diversas lojas parceiras
+          (como Mercado Livre, Shopee, Amazon, entre outras). Preços, condições e disponibilidade são
+          definidos por cada loja e podem mudar a qualquer momento, sem aviso prévio — toda oferta é de
+          responsabilidade da loja vendedora. Não nos responsabilizamos pela entrega, qualidade,
+          funcionamento dos produtos, nem por qualquer problema decorrente da compra: a decisão de comprar
+          é inteiramente sua. Alguns links podem ser de afiliado — podemos receber uma comissão pelas vendas,
+          sem nenhum custo adicional pra você. Confira sempre o preço e os detalhes na página da loja antes
+          de finalizar.
         </p>
       </div>
     </footer>

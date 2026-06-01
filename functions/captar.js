@@ -142,7 +142,7 @@ async function handle(context, method) {
         prefilledCoupon: manualCoupon,
         prefilledPrice: manualPrice,
           error:
-            "Consegui abrir o link, mas não li o preço e a imagem do produto. Confira se é a página de um produto do Mercado Livre com preço visível e tente de novo."
+            "Consegui abrir o link, mas não li o preço e a imagem do produto. Confira se é a página de um produto (Mercado Livre, Shopee, etc.) com preço visível e tente de novo."
         }),
         { status: 422, cacheControl: "no-store" }
       );
@@ -222,7 +222,7 @@ function renderForm({ prefilled = "", prefilledCoupon = "", prefilledPrice = "",
   `;
   return layout({
     title: "Mande sua oferta — Ofertinhas da Delma",
-    description: "Cole um link do Mercado Livre e a oferta entra na vitrine automaticamente.",
+    description: "Cole um link de qualquer loja parceira (Mercado Livre, Shopee, Amazon…) e a oferta entra na vitrine automaticamente.",
     canonical: "/captar",
     body,
     noindex: true

@@ -29,7 +29,7 @@ export async function onRequestGet(context) {
   const seoTitle = offer.seoTitle || `${offer.title} em oferta — ${SITE.name}`;
   const seoDescription =
     offer.seoDescription ||
-    `${offer.title} com preço bom e link direto no Mercado Livre. Veja antes que acabe.`;
+    `${offer.title} com preço bom e link direto na ${loja}. Veja antes que acabe.`;
 
   // Achadinho dura horas/dias, não 2 semanas. Janela curta = schema não "mente" preço
   // pro Google (preço inválido = perda de rich result). Ver War Room 2026-05-30.

@@ -15,23 +15,23 @@ import { layout, offerCard, pagination, htmlResponse, SITE } from "./_lib/render
 const FAQ = [
   {
     q: "Como vocês escolhem as ofertas?",
-    a: "A Delma garimpa à mão no Mercado Livre, compara preço com o histórico e só publica o que vale o clique. Nada de encher a vitrine por encher."
+    a: "A Delma garimpa à mão nas melhores lojas da internet (Mercado Livre, Shopee, Amazon e outras), compara preço e só publica o que vale o clique. Nada de encher a vitrine por encher."
   },
   {
     q: "O preço fica garantido?",
-    a: "O preço e a disponibilidade são definidos pela loja no Mercado Livre no momento da compra. A gente mostra o valor que viu ao publicar, mas confira sempre na página do produto antes de finalizar."
+    a: "Não. O preço, as condições e a disponibilidade são definidos por cada loja e podem mudar a qualquer momento, sem aviso. A gente mostra o valor que viu ao publicar — confira sempre na página da loja antes de finalizar."
   },
   {
     q: "Onde eu finalizo a compra?",
-    a: "Direto no Mercado Livre. Você clica no link, é levado pra plataforma e compra com a proteção que já conhece. A gente não processa pagamento."
+    a: "Direto na loja parceira (Mercado Livre, Shopee, Amazon, etc.). Você clica no link e é levado pra plataforma, onde compra com a proteção dela. A gente não vende nem processa pagamento."
   },
   {
     q: "Tem algum custo pra usar o site?",
-    a: "Nenhum. Os links podem ser de afiliado, ou seja, a gente pode ganhar uma comissão da loja — sem custo a mais pra você."
+    a: "Nenhum. Alguns links podem ser de afiliado, ou seja, a gente pode ganhar uma comissão da loja — sem nenhum custo a mais pra você."
   },
   {
-    q: "Pra quais lugares tem entrega?",
-    a: "Pra todo o Brasil. O prazo e o frete dependem do vendedor e do seu CEP, e aparecem na própria página do Mercado Livre."
+    q: "De quem é a responsabilidade pela compra?",
+    a: "É inteiramente sua e da loja vendedora. Nós só indicamos a oferta — não nos responsabilizamos por entrega, qualidade, funcionamento ou qualquer problema decorrente da compra. Entrega e frete dependem da loja e do seu CEP, e aparecem na página dela."
   }
 ];
 
@@ -96,10 +96,10 @@ export async function onRequestGet(context) {
 
   const title = q
     ? `Busca: ${q} — ${SITE.name}`
-    : `${SITE.name} | Achadinhos com preço bom no Mercado Livre`;
+    : `${SITE.name} | Achadinhos da internet com preço bom`;
   const description = q
-    ? `Resultados de busca para "${q}" — achadinhos selecionados do Mercado Livre, com link direto.`
-    : "Garimpo diário de ofertas no Mercado Livre, com curadoria e link direto. Produto bom, preço justo e entrega pra todo o Brasil.";
+    ? `Resultados de busca para "${q}" — achadinhos selecionados das melhores lojas, com link direto.`
+    : "Garimpo diário de ofertas nas melhores lojas da internet (Mercado Livre, Shopee, Amazon e mais), com curadoria e link direto. Produto bom, preço justo, pra todo o Brasil.";
 
   const itemListLd = view.items.length
     ? {
@@ -196,7 +196,7 @@ function hero() {
       <div class="container hero__inner">
         <p class="hero__eyebrow"><span class="dot" aria-hidden="true"></span> Atualizado com carinho, todo dia</p>
         <h1 id="hero-title" class="hero__title">Achadinhos com <span class="hl">preço que vale o clique</span>.</h1>
-        <p class="hero__sub">Garimpo diário no Mercado Livre: produto bom, preço justo e link direto. Sem enrolação.</p>
+        <p class="hero__sub">Garimpo diário nas melhores lojas da internet: produto bom, preço justo e link direto. Sem enrolação.</p>
       </div>
       <div class="hero__bg" aria-hidden="true"></div>
     </section>
@@ -255,7 +255,7 @@ function trustSection() {
         <div class="trust__grid">
           <article class="trust__item"><span class="trust__icon" aria-hidden="true">★</span><h3>Garimpo manual</h3><p>Cada item passa pelo meu olhar antes de aparecer aqui.</p></article>
           <article class="trust__item"><span class="trust__icon" aria-hidden="true">↺</span><h3>Atualização diária</h3><p>Oferta que acabou some. Só fica o que ainda vale a pena.</p></article>
-          <article class="trust__item"><span class="trust__icon" aria-hidden="true">✓</span><h3>Compra no Mercado Livre</h3><p>Você compra direto na plataforma, com a proteção que já conhece.</p></article>
+          <article class="trust__item"><span class="trust__icon" aria-hidden="true">✓</span><h3>Compra na loja oficial</h3><p>Você compra direto na plataforma parceira (Mercado Livre, Shopee, Amazon…), com a proteção dela.</p></article>
           <article class="trust__item"><span class="trust__icon" aria-hidden="true">♡</span><h3>Sem enrolação</h3><p>Nada de cadastro, pop-up ou caminho indireto. É clicar e ir.</p></article>
         </div>
       </div>
