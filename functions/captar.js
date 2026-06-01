@@ -176,7 +176,9 @@ async function handle(context, method) {
     const baseSlug = slugify(scraped.title || "oferta");
     const slug = uniqueSlug(baseSlug, all.map((o) => o.slug));
     const candidate = ensureOffer({ ...scraped, slug, link: aff || scraped.productUrl });
-    // repost: se o produto já existe, atualiza no lugar e sobe pro topo.
+    // repost: se o produto já existe, atualiza no lugar e sobe pro topo. MANUAL = SEMPRE
+    // bumpa (NÃO usa repostRule): é post intencional do dono — se recolou, quer no topo.
+    // A regra das 48h/preço-menor existe pra conter a raspagem automática, não a humana.
     const { offers: next, offer } = upsertOffer(all, candidate, { bumpToTop: true });
     await saveOffers(env, next);
     await env.OFFERS_KV.put(rateKey, String(Date.now()), { expirationTtl: 600 });
