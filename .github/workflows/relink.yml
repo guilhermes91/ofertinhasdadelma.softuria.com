@@ -12,8 +12,14 @@ on:
         description: 'Backfill sourceUrl: JSON [{"mlId":"...","sourceUrl":"https://meli.la/..."}]'
         required: false
         default: ""
-  # Sem cron próprio: a geração do link roda LOGO APÓS a busca (bot.yml dispara este
-  # workflow quando captura algo). Único agendamento do projeto = a busca (bot, 10min).
+  # Chamado pelo bot.yml LOGO APÓS a busca (mesmo run, sem segundo dispatch). Único
+  # agendamento do projeto = a busca (bot, 10min). Mantém o dispatch manual (seed/compliance).
+  workflow_call:
+    inputs:
+      seed:
+        required: false
+        type: string
+        default: ""
 
 jobs:
   relink:
@@ -25,7 +31,7 @@ jobs:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       API: ${{ secrets.AFFILIATE_API_BASE }}
       AFF_TOKEN: ${{ secrets.AFFILIATE_API_TOKEN }}
-      SEED: ${{ github.event.inputs.seed }}
+      SEED: ${{ inputs.seed || github.event.inputs.seed }}
       SITE: https://ofertinhasdadelma.softuria.com
       BUA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     steps:
@@ -44,7 +50,13 @@ jobs:
           fi
 
           echo "== 1) /health da API =="
-          health=$(curl -fsS --max-time 25 "$API/health") || { echo "::error::API não respondeu ($API)."; exit 1; }
+          # Falha de /health = API fora AGORA, não é bug nosso. Sai VERDE com aviso — as
+          # ofertas ficam escondidas (filtro hasOurLink) e relinkam na próxima busca.
+          # (Bug real — apply 5xx etc. — ainda falha vermelho mais abaixo.)
+          if ! health=$(curl -fsS --max-time 25 "$API/health"); then
+            echo "::warning::API de afiliado fora ($API) — ofertas novas ficam escondidas até relinkar."
+            exit 0
+          fi
           echo "$health"
           if ! echo "$health" | jq -e '.ml_session == true' >/dev/null; then
             echo "::warning::Sessão ML caída na API (ml_session != true) — links ML podem falhar até re-login."

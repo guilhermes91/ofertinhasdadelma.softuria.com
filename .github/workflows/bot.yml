@@ -1,7 +1,7 @@
 name: Bot de ofertas (Mercado Livre)
 
-# DESARMADO por padrão: roda só no disparo manual (workflow_dispatch).
-# Para ARMAR o cron de 10 em 10 min, descomente o bloco `schedule` abaixo.
+# Único agendamento do projeto: a busca nas fontes (cron 10min). Quando captura algo,
+# o link de afiliado é gerado NO MESMO run (job `relink` reusable) — sem segundo dispatch.
 on:
   workflow_dispatch:
     inputs:
@@ -12,13 +12,21 @@ on:
   schedule:
     - cron: "*/10 * * * *"   # a cada 10 minutos (ARMADO)
 
+# Serializa os runs do bot: o KV é uma chave única (offers:all) com read-modify-write
+# sem lock — dois runs sobrepostos se sobrescreveriam (last-write-wins). cancel-in-progress
+# false = enfileira em vez de cancelar (não perde captura).
+concurrency:
+  group: bot-offers
+  cancel-in-progress: false
+
 jobs:
   capturar:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write   # pra disparar o relink.yml após capturar
+    outputs:
+      should_relink: ${{ steps.captura.outputs.should_relink }}
     steps:
       - name: Disparar captação no /api/bot
+        id: captura
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           MAX: ${{ github.event.inputs.max || '8' }}
@@ -42,14 +50,19 @@ jobs:
             echo "::error::Bot retornou HTTP $code (esperava 2xx). Veja o corpo acima."
             exit 1
           fi
-          # se entrou/mudou/corrigiu algo, sinaliza pra rodar o relink (gera nosso link
-          # -> a oferta passa a aparecer na vitrine, que só mostra ofertas com nosso link)
-          if [ "$(jq '((.added//0)+(.refreshed//0)+(.corrected//0))' resposta.json)" -gt 0 ]; then
-            echo "RELINK=1" >> "$GITHUB_ENV"
+          # Entrou oferta nova OU corrigiu preço/cupom (que pode ter ficado sem link) ->
+          # gera o nosso link na sequência. `refreshed` (repost já-linkado) NÃO conta.
+          if [ "$(jq '((.added//0)+(.corrected//0))' resposta.json)" -gt 0 ]; then
+            echo "should_relink=1" >> "$GITHUB_OUTPUT"
           fi
           echo "Concluído."
-      - name: Disparar relink (monetiza as novas)
-        if: env.RELINK == '1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run relink.yml || echo "::warning::não consegui disparar o relink (segue no cron)."
+
+  # MESMA run: gera o nosso link de afiliado logo após a captura (a API é sempre on).
+  # Só roda se a captura mudou algo. Reusa o relink.yml (1 fonte de verdade; o manual
+  # seed/compliance continua por workflow_dispatch). Falha de API fora cai VERDE (warning)
+  # dentro do relink.yml -> não vira spam vermelho; a oferta relinka na próxima busca.
+  relink:
+    needs: capturar
+    if: needs.capturar.outputs.should_relink == '1'
+    uses: ./.github/workflows/relink.yml
+    secrets: inherit
