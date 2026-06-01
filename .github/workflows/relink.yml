@@ -1,30 +1,30 @@
-name: Relink afiliado (via API gerador-link-afiliados)
+name: Relink afiliado (via API gerador-aff-links)
 
-# Gera os NOSSOS links pela API externa (no runner, que alcança a porta 8000).
-# Usa o link da FONTE (sourceUrl, o meli.la) de cada oferta — a API resolve o
-# produto certo (sem depender do mlId, que p/ catálogo vinha bogus).
-# Fluxo: [seed opcional] -> /health -> list -> /v2/generate/batch -> apply.
-#
-# Pré-requisito: instância EC2 da API LIGADA.
+# Gera os NOSSOS links de afiliado pela API externa (gerador-aff-links) e grava de volta.
+# A API nova é um HOSTNAME HTTPS (sem EC2 sob demanda) — base no secret AFFILIATE_API_BASE,
+# token no secret AFFILIATE_API_TOKEN. Manda o sourceUrl (meli.la) de cada oferta; a API
+# resolve o produto e devolve o short_url com a nossa tag.
+# Fluxo: [seed opcional] -> /health -> list -> POST /afiliado {urls} -> apply.
 on:
   workflow_dispatch:
     inputs:
-      api:
-        description: "Base URL da API (deixe vazio p/ usar o secret AFFILIATE_API_BASE)"
-        required: false
-        default: ""
       seed:
         description: 'Backfill sourceUrl: JSON [{"mlId":"...","sourceUrl":"https://meli.la/..."}]'
         required: false
         default: ""
+  schedule:
+    - cron: "23 */6 * * *" # monetiza o catálogo a cada ~6h (a API é hospedada, sempre on)
 
 jobs:
   relink:
     runs-on: ubuntu-latest
+    concurrency:
+      group: relink
+      cancel-in-progress: false
     env:
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      # Base da API fora do repo público: input manual OU secret AFFILIATE_API_BASE.
-      API: ${{ github.event.inputs.api || secrets.AFFILIATE_API_BASE }}
+      API: ${{ secrets.AFFILIATE_API_BASE }}
+      AFF_TOKEN: ${{ secrets.AFFILIATE_API_TOKEN }}
       SEED: ${{ github.event.inputs.seed }}
       SITE: https://ofertinhasdadelma.softuria.com
       BUA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -33,7 +33,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${BOT_TOKEN:-}" ]; then echo "::error::BOT_TOKEN ausente."; exit 1; fi
-          if [ -z "${API:-}" ]; then echo "::error::Base da API ausente: passe o input 'api' ou configure o secret AFFILIATE_API_BASE."; exit 1; fi
+          if [ -z "${API:-}" ]; then echo "::error::secret AFFILIATE_API_BASE ausente."; exit 1; fi
+          if [ -z "${AFF_TOKEN:-}" ]; then echo "::error::secret AFFILIATE_API_TOKEN ausente."; exit 1; fi
 
           if [ -n "${SEED:-}" ]; then
             echo "== 0) seed de sourceUrl =="
@@ -43,10 +44,11 @@ jobs:
           fi
 
           echo "== 1) /health da API =="
-          if ! curl -fsS --max-time 25 "$API/health"; then
-            echo "::error::API não respondeu ($API). A instância EC2 está ligada?"; exit 1
+          health=$(curl -fsS --max-time 25 "$API/health") || { echo "::error::API não respondeu ($API)."; exit 1; }
+          echo "$health"
+          if ! echo "$health" | jq -e '.ml_session == true' >/dev/null; then
+            echo "::warning::Sessão ML caída na API (ml_session != true) — links ML podem falhar até re-login."
           fi
-          echo ""
 
           echo "== 2) candidatos =="
           curl -fsS -A "$BUA" -H "Authorization: Bearer $BOT_TOKEN" "$SITE/api/relink?list=1" -o cand.json
@@ -54,20 +56,22 @@ jobs:
           echo "candidatos: $N"
           if [ "$N" -eq 0 ]; then echo "Nada a relinkar. Fim."; exit 0; fi
 
-          echo "== 3) gerar em lote (a partir do link da fonte) =="
+          echo "== 3) gerar em lote via POST /afiliado (a partir do sourceUrl) =="
+          # lotes de 20 (limite da API). Aqui mandamos tudo de uma vez se N<=20; senão fatia.
           jq '{urls: [.candidates[].genUrl]}' cand.json > batch_req.json
-          curl -fsS --max-time 240 -X POST "$API/v2/generate/batch" \
-            -H "Content-Type: application/json" -d @batch_req.json -o gen.json
+          curl -fsS --max-time 240 -X POST "$API/afiliado" \
+            -H "Authorization: Bearer $AFF_TOKEN" -H "Content-Type: application/json" \
+            -d @batch_req.json -o gen.json
+          # envelope: { ok, resultados: [ { ok, short_url, erro } ] } — alinhado por índice
           jq -n --slurpfile c cand.json --slurpfile g gen.json '
             { updates: [ range(0; ($c[0].candidates | length)) as $i
                 | { id: $c[0].candidates[$i].id,
-                    link: ($g[0][$i].short_url // $g[0][$i].affiliate_url // $g[0][$i].long_url) }
+                    link: (($g[0].resultados[$i] // {}) | select(.ok == true) | (.short_url // .affiliate_url // .long_url)) }
                 | select(.link != null) ] }' > updates.json
           U=$(jq '.updates | length' updates.json)
           echo "links gerados: $U de $N"
-          echo "== falhas (sem link) =="
-          jq -r '.[] | select((.short_url==null) and (.affiliate_url==null) and (.long_url==null))
-                 | "\(.url // .original_url // "?")  ERR=\(.error // .detail // "?")"' gen.json || true
+          echo "== falhas (item ok=false) =="
+          jq -r '.resultados[]? | select(.ok != true) | "\(.url // "?")  ERR=\(.erro // "?")"' gen.json | head -20 || true
 
           echo "== 4) aplicar no site =="
           code=$(curl -sS -w '%{http_code}' -o applied.json -X POST "$SITE/api/relink" \

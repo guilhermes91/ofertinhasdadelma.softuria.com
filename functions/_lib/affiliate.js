@@ -1,27 +1,23 @@
-// Geração de link de afiliado DELEGADA à API externa (gerador-link-afiliados).
-// A responsabilidade de sessão ML/Shopee é DELA — aqui só chamamos /v2/generate.
+// Geração de link de afiliado DELEGADA à API externa (gerador-aff-links).
+// A responsabilidade de sessão ML/Shopee é DELA — aqui só chamamos POST /afiliado.
 //
-// ⚠️ Por padrão o edge NÃO chama nada: a API roda numa EC2 sob demanda (pode estar
-// desligada) e o fetch do Workers bloqueia a porta 8000 → chamar do edge travaria
-// no timeout. A monetização real roda no GitHub Actions (workflow relink.yml), que
-// alcança a API e grava os links de volta via POST /api/relink {updates}.
+// A API nova é um HOSTNAME HTTPS (alcançável pelo edge do Workers) com Bearer token.
+// Envelope: { ok, resultados: [ { ok, short_url, ... } ] }. Aceita {url} ou {urls:[]}.
+// Só ativa se AFFILIATE_API_URL + AFFILIATE_API_TOKEN estiverem setados (env do Pages,
+// fora do repo público). Degrada com segurança: qualquer falha → null, e o caller usa a
+// URL de produto LIMPA — NUNCA o link da fonte/concorrente.
 //
-// Só ativa no edge se AFFILIATE_API_URL estiver setado (ex.: a API exposta em HTTPS
-// numa porta permitida). Mesmo aí, degrada com segurança: qualquer falha → null, e o
-// caller usa a URL de produto LIMPA — NUNCA o link da fonte/concorrente.
-
-// Base da API vem da env AFFILIATE_API_URL (setada no projeto Pages, fora do repo
-// público p/ não vazar o hostname). DEVE ser um HOSTNAME, não IP — o fetch do
-// Workers recusa IP cru com erro 1003. Sem a env → não gera (caller usa URL limpa).
-const TIMEOUT_MS = 9000; // cobre o fallback v1 (playwright ~7s); ainda seguro p/ 1 oferta
-const GENERATE_PATH = "/v2/generate";
+// ⚠️ A API REJEITA `produto.mercadolivre.com.br/MLB-<id>`. Mande o `sourceUrl` (meli.la)
+// ou uma URL `/p/<mlId>` — ambos aceitos (resolvem o produto e devolvem a NOSSA tag).
+const TIMEOUT_MS = 12000;
+const GENERATE_PATH = "/afiliado";
 
 // compat: /api/ml-session (legado) ainda importa isto. A sessão ML agora é da API externa.
 export const ML_SESSION_KEY = "ml:session";
 
 // Chama a API externa pra 1 URL de produto. Exportada pra reuso (edge e testes).
-// Retorna o link de afiliado (short_url/affiliate_url) ou null.
-export async function affiliateFromApi(productUrl, baseUrl, fetchImpl = fetch) {
+// Retorna o link de afiliado (short_url) ou null.
+export async function affiliateFromApi(productUrl, baseUrl, token, fetchImpl = fetch) {
   if (!productUrl || !baseUrl) return null;
   const url = `${String(baseUrl).replace(/\/+$/, "")}${GENERATE_PATH}`;
   const ctrl = new AbortController();
@@ -29,7 +25,11 @@ export async function affiliateFromApi(productUrl, baseUrl, fetchImpl = fetch) {
   try {
     const res = await fetchImpl(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({ url: productUrl }),
       signal: ctrl.signal
     });
@@ -43,10 +43,12 @@ export async function affiliateFromApi(productUrl, baseUrl, fetchImpl = fetch) {
   }
 }
 
-// ML → short_url; Shopee → affiliate_url; fallback long_url (ainda é a NOSSA tag).
+// Novo envelope {ok, resultados:[{ok, short_url}]}. Aceita também o item cru (compat).
+// ML → short_url; Shopee → short_url/affiliate_url; só usa quando o item é ok.
 export function pickLink(data) {
-  if (!data || typeof data !== "object") return null;
-  const link = data.short_url || data.affiliate_url || data.long_url;
+  const item = data && Array.isArray(data.resultados) ? data.resultados[0] : data;
+  if (!item || typeof item !== "object" || item.ok === false) return null;
+  const link = item.short_url || item.affiliate_url || item.long_url;
   return typeof link === "string" && /^https?:\/\//i.test(link) ? link : null;
 }
 
@@ -54,6 +56,7 @@ export function pickLink(data) {
 export async function generateAffiliate(productUrl, env) {
   if (!productUrl) return null;
   const base = env && env.AFFILIATE_API_URL;
+  const token = env && env.AFFILIATE_API_TOKEN;
   if (!base) return null; // sem env configurada → caller usa URL limpa
-  return affiliateFromApi(productUrl, base);
+  return affiliateFromApi(productUrl, base, token);
 }

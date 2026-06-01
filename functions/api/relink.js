@@ -32,6 +32,12 @@ function productUrlFromId(mlId) {
   return mlId ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}` : "";
 }
 
+// URL p/ MANDAR pra API de afiliado. A API rejeita `produto.mercadolivre.com.br/MLB-`;
+// aceita `/p/<mlId>` (e o sourceUrl meli.la). Usada só como fallback quando não há sourceUrl.
+function genUrlFromId(mlId) {
+  return mlId ? `https://www.mercadolivre.com.br/p/${String(mlId).toUpperCase()}` : "";
+}
+
 function isOurAffiliateLink(link, tag) {
   const l = String(link || "").toLowerCase();
   return /(?:^|\/\/)meli\.la\//.test(l) || l.includes("/social/" + tag.toLowerCase());
@@ -74,7 +80,7 @@ async function run(context, method) {
   if (method === "GET" && url.searchParams.get("list") === "1") {
     const candidates = offers
       .filter((o) => !isOurAffiliateLink(o.link, tag))
-      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: o.sourceUrl || productUrlFromId(o.mlId) }))
+      .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: o.sourceUrl || genUrlFromId(o.mlId) }))
       .filter((c) => c.genUrl);
     return jsonResponse({ ok: true, total: offers.length, candidates });
   }
