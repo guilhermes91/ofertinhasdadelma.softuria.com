@@ -16,15 +16,18 @@ const COMPLETE_PATH = "/completo";
 // compat: /api/ml-session (legado) ainda importa isto. A sessão ML agora é da API externa.
 export const ML_SESSION_KEY = "ml:session";
 
-// Config da API: env do Pages OU KV (aff:url / aff:token — setado pelo relink.yml, igual
-// ao bot:token). Assim o edge gera link em tempo real SEM precisar setar env no Cloudflare.
+// Config da API: KV (aff:url / aff:token — setado pelo relink.yml, igual ao bot:token)
+// tem PRIORIDADE sobre a env do Pages, porque pode existir uma `AFFILIATE_API_URL` antiga
+// (de sessão passada, apontando pra API velha) na env — o KV é a fonte da verdade atual.
 export async function affConfig(env) {
-  let base = (env && env.AFFILIATE_API_URL) || "";
-  let token = (env && env.AFFILIATE_API_TOKEN) || "";
-  if ((!base || !token) && env && env.OFFERS_KV) {
-    if (!base) base = (await env.OFFERS_KV.get("aff:url")) || "";
-    if (!token) token = (await env.OFFERS_KV.get("aff:token")) || "";
+  let base = "";
+  let token = "";
+  if (env && env.OFFERS_KV) {
+    base = (await env.OFFERS_KV.get("aff:url")) || "";
+    token = (await env.OFFERS_KV.get("aff:token")) || "";
   }
+  if (!base) base = (env && env.AFFILIATE_API_URL) || "";
+  if (!token) token = (env && env.AFFILIATE_API_TOKEN) || "";
   return { base: base.replace(/\/+$/, ""), token };
 }
 

@@ -36,10 +36,12 @@ async function handle(context, method) {
   // PROBE temporário: /captar?probe=<urlML> — testa se o edge alcança a API /completo.
   if (url.searchParams.get("probe")) {
     const { affConfig, completeOffer } = await import("./_lib/affiliate.js");
+    const kvUrl = await env.OFFERS_KV.get("aff:url");
+    const kvTok = await env.OFFERS_KV.get("aff:token");
     const cfg = await affConfig(env);
     let res = null, erro = null;
     try { res = await completeOffer(url.searchParams.get("probe"), env); } catch (e) { erro = String(e); }
-    return new Response(JSON.stringify({ cfgBase: cfg.base, cfgToken: !!cfg.token, completo: res, erro }), {
+    return new Response(JSON.stringify({ kvUrl, kvTokenLen: (kvTok || "").length, cfgBase: cfg.base, cfgToken: !!cfg.token, completo: res, erro }), {
       headers: { "content-type": "application/json", "cache-control": "no-store" }
     });
   }
