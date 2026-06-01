@@ -221,6 +221,23 @@ Red-team (devil), Infra Cloudflare×AWS (par adversarial). O atrito achou o que 
 - [ ] (Opcional) Aprovar alarme de comissão (`/api/relink?list=1`) e/ou migração EC2→Lambda.
 
 
+### 6.9 Shopee via API de scraping TERCEIRIZADA  ✅ FEITO (2026-05-31)
+Decisão (dono): a extração de dados da **Shopee** é delegada a uma **API externa** dele
+(mesmo padrão da geração de link, §6.7) — não scrape próprio. Endpoint `POST /scrape`
+(Bearer token) recebe `{urls:[...]}` e devolve `{ok, resultados:[{status, name, preco (num),
+price (str), image, description, shopid, itemid, erro}]}`. **Implementado:** `functions/_lib/shopee.js`
+(cliente + monta a oferta no shape do catálogo). `scraper.js` teve o `enrichWithGemini`
+**generalizado pra aceitar a loja** (default "Mercado Livre" → ML intacto; reuso DRY pra Shopee).
+`captar.js` aceita link `shopee.com.br`, roteia pro scraper certo e ganhou **`?dry=1`** (preview
+JSON, não publica — testar sem poluir a vitrine). **Dedup:** Shopee não tem `mlId` → grava
+`link`/`sourceUrl` = **URL canônica limpa** `shopee.com.br/product/<shopid>/<itemid>` (chave estável).
+**Compliance:** link salvo é a URL limpa (sem tag de terceiro). **Config (env vars do Pages, FORA
+do repo público):** `SHOPEE_SCRAPE_API_URL` + `SHOPEE_SCRAPE_TOKEN` (secrets via wrangler).
+**Validado em produção (`/captar?dry=1`, 2026-05-31):** produto real, preço, imagem, tags do Gemini,
+link limpo — o **edge alcança a API** (HTTPS/443/hostname, sem o problema de porta 8000 do §6.7).
+**Fase 2 (pendente):** afiliado Shopee (a mesma API externa devolve `affiliate_url`; falta
+`SHOPEE_AFFILIATE_ID`/EC2) e uma **fonte Shopee pro bot** (hoje o bot só capta ML do Promotop).
+
 ### 6.1 De-geo → nacional  ✅ FEITO (2026-05-28)
 
 **Decisão (dono):** site geo-neutro/nacional. A geo de Guarujá saiu de ~16 pontos e foi
