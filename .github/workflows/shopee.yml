@@ -11,7 +11,7 @@ on:
         required: false
         default: "2"
   schedule:
-    - cron: "7,37 * * * *"   # 2x por hora (espaçado; Shopee é lento)
+    - cron: "12 * * * *"   # horário: FALLBACK do Worker (que faz Shopee nos min 7 e 37). Ver CONTEXTO §6.10
 
 concurrency:
   group: bot-shopee

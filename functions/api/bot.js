@@ -18,13 +18,21 @@ import {
 import { jsonResponse } from "../_lib/render.js";
 import { discoverMlOffers } from "../_lib/portals.js";
 import { constantTimeEquals } from "../_lib/auth.js";
+import { generateAffiliate } from "../_lib/affiliate.js";
 
 const DEFAULT_MAX = 8; // teto de ofertas NOVAS publicadas por execução
 const HARD_MAX = 20;
 // teto de fetch+extract (fase 1, sem Gemini) por execução — varremos até `max` novas
 // OU até este teto, o que vier antes. Bound do limite de subrequests do Workers (~50):
-// descoberta (~13) + SCRAPE_BUDGET + Gemini (≤max) fica folgado abaixo de 50.
-const SCRAPE_BUDGET = 10;
+// descoberta (~14) + SCRAPE_BUDGET×~2 + Gemini (≤max) + geração inline (≤added) precisa
+// caber abaixo de 50. Por isso 8 (não 10): a captura agora MONETIZA na hora (+1 subreq por
+// oferta nova), e a cron confiável de 10min do Worker roda mais vezes — cada run faz menos.
+const SCRAPE_BUDGET = 8;
+// Lock advisório no KV: a cron de 10min do Worker pode sobrepor um run que travou —
+// saveOffers é read-modify-write sem CAS na chave única offers:all. TTL curto (cobre 1 run
+// ~1-2min e ainda libera bem antes da próxima cron). Auto-cura em exceção (não-deletado).
+const LOCK_KEY = "bot:lock";
+const LOCK_TTL_S = 240;
 // títulos que NÃO são de produto (páginas de lista/perfil/recomendações do ML)
 const JUNK_TITLE = /minhas listas|recomenda(ç|c)|listas? de\b|^ofertas\b|^mercado livre$/i;
 
@@ -62,10 +70,21 @@ async function run(context) {
   );
   const dry = url.searchParams.get("dry") === "1";
 
+  // Lock: se outro run está em curso, pula (não corrompe o KV com last-write-wins).
+  if (!dry) {
+    const held = await env.OFFERS_KV.get(LOCK_KEY);
+    if (held) {
+      return jsonResponse({ ok: true, skipped: "lock", lockedSince: held });
+    }
+    await env.OFFERS_KV.put(LOCK_KEY, String(Date.now()), { expirationTtl: LOCK_TTL_S });
+  }
+  const releaseLock = async () => { if (!dry) await env.OFFERS_KV.delete(LOCK_KEY); };
+
   let candidates = [];
   try {
     candidates = await discoverMlOffers();
   } catch (err) {
+    await releaseLock();
     return jsonResponse(
       { error: "Falha na descoberta: " + (err.message || "") },
       { status: 502 }
@@ -165,9 +184,13 @@ async function run(context) {
     const slug = uniqueSlug(slugify(scrapedOffer.title || "oferta"), offers.map((o) => o.slug));
     // cupom: prefere o código DIGITÁVEL da fonte (Promobit) ao campaignId do ML
     const coupon = (cand.coupon && cand.coupon.code) ? cand.coupon : scrapedOffer.coupon;
-    // ⚠️ COMPLIANCE: NUNCA salvar `link` (o meli.la da FONTE tem a tag do concorrente).
-    // Grava URL LIMPA + `sourceUrl`; o relink.yml monetiza quando a EC2 estiver ligada.
-    const candidate = ensureOffer({ ...scrapedOffer, slug, link: scrapedOffer.productUrl, coupon, seller: "Mercado Livre" });
+    // MONETIZAÇÃO INLINE: gera o NOSSO link de afiliado NA HORA (a API é sempre on). Seed =
+    // finalUrl (/social resolvido — forma que o relink prova ser aceita) ou sourceUrl (meli.la).
+    // Degrada SEGURO: API fora/rejeita → null → URL de produto LIMPA (a oferta esconde via
+    // hasOurLink e o relink.yml horário/manual monetiza depois). +1 subreq por oferta nova.
+    // ⚠️ COMPLIANCE: NUNCA salvar o link da FONTE (tem a tag do concorrente); fallback = limpo.
+    const ourLink = await generateAffiliate(base.finalUrl || scrapedOffer.sourceUrl, env);
+    const candidate = ensureOffer({ ...scrapedOffer, slug, link: ourLink || scrapedOffer.productUrl, coupon, seller: "Mercado Livre" });
     const r = upsertOffer(offers, candidate, { onlyIfChanged: true, bumpToTop: true });
     offers = r.offers;
     byMlId.set(candidate.mlId, r.offer); // não reprocessa o mesmo produto neste run
@@ -179,6 +202,8 @@ async function run(context) {
   if (!dry && (added.length || refreshed.length || corrected)) {
     await saveOffers(env, offers);
   }
+
+  await releaseLock();
 
   return jsonResponse({
     ok: true,

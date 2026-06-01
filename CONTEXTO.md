@@ -401,6 +401,38 @@ Troca da API `gerador-link-afiliados` (EC2 IP:8000, sob demanda) pela **`gerador
 - Decidido em **War Room** (CI maker + devil release): failure isolation, proteção de KV, manual intacto,
   sem disparo duplo, menos privilégio. As pendências de segurança/EC2 antigas saem do standby como **obsoletas**.
 
+### 6.11 Cadência confiável: Cron Trigger de Worker + geração INLINE no /api/bot  ✅ (2026-06-01)
+
+**Problema:** o cron `*/10` do GitHub Actions é **throttlado** pela plataforma (rodava ~1x/h, não a
+cada 10min) → ofertas novas das fontes demoravam ~1h pra aparecer ("parou de funcionar"). O bot em
+si SEMPRE funcionou (cada run adicionava 7-8). O gargalo era **só o agendamento**.
+
+**Decisão (War Room infra maker + devil):** o **Cron Trigger de Worker** (`workers/captador/`) vira o
+relógio PRIMÁRIO — roda dentro da Cloudflare, sem o throttle do GitHub. Furo decisivo do devil: o
+Worker só **dispara** (`fetch`) as Functions do Pages; o trabalho pesado segue rodando na Pages
+Function, sob o MESMO teto de subrequests (~50). Logo o Worker resolve **só o agendamento** (que era o
+problema), não os limites de edge.
+
+- **Worker `ofertinhas-captador`** (`scheduled` + `ctx.waitUntil`): crons `*/10` (ML → `/api/bot?max=6`)
+  e `7,37` (Shopee → `/api/shopee?max=2`). Auth = `BOT_TOKEN` como **secret próprio** (menor privilégio,
+  SEM bind do `OFFERS_KV`). Deploy via `.github/workflows/deploy-worker.yml` (reusa `CLOUDFLARE_API_TOKEN`/
+  `ACCOUNT_ID` + `BOT_TOKEN` — zero credencial nova; a action seta o secret via `secrets:`).
+- **Geração INLINE no `/api/bot`** (o "gerar na hora" do dono): após o scrape, o link de afiliado é
+  gerado na mesma chamada via `generateAffiliate(base.finalUrl || sourceUrl)` — `finalUrl` é o `/social`
+  já resolvido pelo scrape (forma que o relink prova ser aceita). Degrada SEGURO: API fora/rejeita →
+  `null` → URL de produto limpa (esconde via `hasOurLink`; o backstop relinka). `scrapeOfferRaw` agora
+  expõe `finalUrl`. `SCRAPE_BUDGET` 10→8 pra caber o +1 subreq/oferta no teto.
+- **Lock no KV (`bot:lock`, TTL 240s):** cron confiável de 10min pode sobrepor um run travado, e
+  `saveOffers` é read-modify-write sem CAS na chave única → corromperia o catálogo (last-write-wins).
+  Furo crítico do devil. O `/api/bot` pula se há lock; auto-cura por TTL em exceção.
+- **GitHub vira FALLBACK horário:** `bot.yml` (`5 * * * *`) e `shopee.yml` (`12 * * * *`) — se o Worker
+  cair, captura continua; e o `bot.yml` horário é o ÚNICO lugar onde o **relink de reconciliação** roda
+  automático (recupera ofertas que entraram sem link). `relink.yml` segue manual (seed/compliance).
+- **Ações de dono p/ ativar:** (1) o `CLOUDFLARE_API_TOKEN` precisa de escopo **Workers Scripts:Edit**
+  (além de Pages) — senão o `deploy-worker.yml` falha; (2) conferir nos logs do Worker (`wrangler tail`)
+  que a 1ª cron disparou 200 com `added>0`. Furo do devil sobre BFM: **NÃO religar o Bot Fight Mode** —
+  quebraria o fallback do GitHub.
+
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
 O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava

@@ -1,7 +1,10 @@
 name: Bot de ofertas (Mercado Livre)
 
-# Único agendamento do projeto: a busca nas fontes (cron 10min). Quando captura algo,
-# o link de afiliado é gerado NO MESMO run (job `relink` reusable) — sem segundo dispatch.
+# A cadência PRIMÁRIA de 10min agora é o Cron Trigger do Worker (workers/captador), que
+# roda dentro da Cloudflare e não sofre o throttle do GitHub (que degradava o */10 pra
+# ~1x/h). Este cron horário é só FALLBACK + BACKSTOP: se o Worker cair, captura continua;
+# e este é o ÚNICO lugar onde o relink de reconciliação roda automático (recupera ofertas
+# que entraram sem link porque a API estava fora na captura inline). Ver CONTEXTO.md §6.10.
 on:
   workflow_dispatch:
     inputs:
@@ -10,7 +13,7 @@ on:
         required: false
         default: "8"
   schedule:
-    - cron: "*/10 * * * *"   # a cada 10 minutos (ARMADO)
+    - cron: "5 * * * *"   # de hora em hora (fallback do Worker + backstop do relink)
 
 # Serializa os runs do bot: o KV é uma chave única (offers:all) com read-modify-write
 # sem lock — dois runs sobrepostos se sobrescreveriam (last-write-wins). cancel-in-progress

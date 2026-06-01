@@ -42,7 +42,10 @@ export async function scrapeOfferRaw(rawUrl) {
   // afiliados (validado): produto.mercadolivre.com.br/MLB-<id>. (/p/MLB... e /social dão erro 111.)
   const productUrl = `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}`;
 
-  return { url, raw, coupon, mlId, productUrl, sourceUrl: rawUrl };
+  // finalUrl = destino RESOLVIDO (meli.la/dpl → /social/<tag>?ref=...). É a forma que a
+  // API de afiliado NOVA aceita (o relink prova: resolve p/ /social antes do /afiliado).
+  // O bot usa isto como seed da geração inline; cai pro sourceUrl (meli.la) se vazio.
+  return { url, raw, coupon, mlId, productUrl, sourceUrl: rawUrl, finalUrl };
 }
 
 // Fase 2 (CARA, com Gemini): enriquece a base já extraída. `store` parametriza a loja

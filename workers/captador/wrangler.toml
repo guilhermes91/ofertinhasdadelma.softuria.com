@@ -1,0 +1,20 @@
+# Worker "captador" — APENAS o RELÓGIO da captação. Não faz scraping nem monetização:
+# só chama as Functions do Pages (/api/bot e /api/shopee), que já têm toda a lógica
+# (captura + geração inline do link de afiliado). O ganho aqui é CADÊNCIA CONFIÁVEL:
+# Cron Triggers de Worker rodam DENTRO da Cloudflare, sem o throttle do GitHub Actions
+# (que degradava o */10 pra ~1x/hora). Ver CONTEXTO.md §6.10.
+name = "ofertinhas-captador"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+
+# ML a cada 10min; Shopee nos minutos 7 e 37 (lenta, ~20s/item, volume baixo). Como 7 e 37
+# NÃO são múltiplos de 10, cada disparo é claramente ML OU Shopee — nunca os dois juntos.
+[triggers]
+crons = ["*/10 * * * *", "7,37 * * * *"]
+
+[vars]
+SITE = "https://ofertinhasdadelma.softuria.com"
+
+# BOT_TOKEN é SECRET (wrangler secret put, via deploy-worker.yml) — NÃO vai aqui (repo público).
+# Menor privilégio: o Worker só tem o token de captação, sem bind do OFFERS_KV (que daria
+# acesso a ml:session/aff:token). Ele autentica no /api/bot com Bearer, igual ao bot.yml faz.

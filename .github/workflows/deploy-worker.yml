@@ -1,0 +1,36 @@
+name: Deploy Worker captador (Cron Trigger)
+
+# Deploya o Worker "captador" (o relógio confiável da captação) e seta o secret BOT_TOKEN.
+# Reusa os MESMOS secrets do deploy do Pages (CLOUDFLARE_API_TOKEN/ACCOUNT_ID + BOT_TOKEN) —
+# nenhuma credencial nova. Só dispara quando o Worker muda (ou manualmente).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/captador/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: worker-captador-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy Worker + secret BOT_TOKEN
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/captador
+          command: deploy
+          # A action roda `wrangler secret put` p/ cada nome listado, lendo o valor do env.
+          secrets: |
+            BOT_TOKEN
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
