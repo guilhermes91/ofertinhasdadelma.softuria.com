@@ -34,23 +34,6 @@ async function handle(context, method) {
   const url = new URL(request.url);
 
   // PROBE temporário: /captar?probe=<urlML> — testa se o edge alcança a API /completo.
-  if (url.searchParams.get("setaff")) {
-    if (url.searchParams.get("seturl")) await env.OFFERS_KV.put("aff:url", url.searchParams.get("seturl"));
-    if (url.searchParams.get("settoken")) await env.OFFERS_KV.put("aff:token", url.searchParams.get("settoken"));
-    return new Response(JSON.stringify({ set: true }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
-  }
-  if (url.searchParams.get("probe")) {
-    const { affConfig, completeOffer } = await import("./_lib/affiliate.js");
-    const kvUrl = await env.OFFERS_KV.get("aff:url");
-    const kvTok = await env.OFFERS_KV.get("aff:token");
-    const cfg = await affConfig(env);
-    let res = null, erro = null;
-    try { res = await completeOffer(url.searchParams.get("probe"), env); } catch (e) { erro = String(e); }
-    return new Response(JSON.stringify({ kvUrl, kvTokenLen: (kvTok || "").length, cfgBase: cfg.base, cfgToken: !!cfg.token, completo: res, erro }), {
-      headers: { "content-type": "application/json", "cache-control": "no-store" }
-    });
-  }
-
   let target = url.searchParams.get("url");
   // campos manuais (opcionais): se preenchidos, mandam; se vazios, usamos o scrape.
   let manualCoupon = (url.searchParams.get("coupon") || "").trim();

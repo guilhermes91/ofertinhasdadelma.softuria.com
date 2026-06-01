@@ -44,8 +44,8 @@ jobs:
 
           echo "== 0) garante a config da API no KV (pro /captar gerar link em tempo real) =="
           curl -fsS -A "$BUA" -H "Authorization: Bearer $BOT_TOKEN" -H "Content-Type: application/json" \
-            -X POST "$SITE/api/relink" -d "{\"aff\":{\"url\":\"$API\",\"token\":\"$AFF_TOKEN\"}}" >/dev/null \
-            && echo "config no KV ok" || echo "::warning::não consegui setar a config no KV"
+            -X POST "$SITE/api/relink" -d "{\"aff\":{\"url\":\"$API\",\"token\":\"$AFF_TOKEN\"}}" \
+            -o aff_set.json && cat aff_set.json && echo "" || echo "::warning::não consegui setar a config no KV"
 
           if [ -n "${SEED:-}" ]; then
             echo "== 0) seed de sourceUrl =="
