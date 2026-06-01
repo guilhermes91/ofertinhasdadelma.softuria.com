@@ -45,10 +45,12 @@ export async function scrapeOfferRaw(rawUrl) {
   return { url, raw, coupon, mlId, productUrl, sourceUrl: rawUrl };
 }
 
-// Fase 2 (CARA, com Gemini): enriquece a base já extraída.
-export async function enrichOffer(base, env) {
+// Fase 2 (CARA, com Gemini): enriquece a base já extraída. `store` parametriza a loja
+// (default ML; "Shopee" pro caminho Shopee) — pra copy/seller não dizerem "Mercado Livre"
+// numa oferta Shopee.
+export async function enrichOffer(base, env, store = "Mercado Livre") {
   const { url, raw, coupon, mlId, productUrl, sourceUrl } = base;
-  const enriched = await enrichWithGemini(raw, url, env);
+  const enriched = await enrichWithGemini(raw, url, env, store);
   return {
     mlId,
     productUrl,
@@ -70,7 +72,7 @@ export async function enrichOffer(base, env) {
     bestseller: !!raw.bestseller,
     isNew: true,
     coupon,
-    seller: "Mercado Livre"
+    seller: store
   };
 }
 

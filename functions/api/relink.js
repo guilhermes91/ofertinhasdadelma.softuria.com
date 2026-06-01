@@ -81,6 +81,9 @@ async function run(context, method) {
   // --- LISTAR candidatos p/ o GHA gerar ---
   if (method === "GET" && url.searchParams.get("list") === "1") {
     const candidates = offers
+      // só ML: oferta Shopee já vem com nosso link inline (s.shopee.com.br/an_redir),
+      // não passa pelo relink (que gera link de afiliado do ML).
+      .filter((o) => o.store !== "shopee" && !/s\.shopee\.com\.br/i.test(String(o.link || "")))
       .filter((o) => !isOurAffiliateLink(o.link, tag))
       .map((o) => ({ id: o.id, slug: o.slug, mlId: o.mlId, genUrl: o.sourceUrl || genUrlFromId(o.mlId) }))
       .filter((c) => c.genUrl);
@@ -140,6 +143,8 @@ async function run(context, method) {
   const skipped = [];
   let safe = 0;
   for (const o of offers) {
+    // Shopee: link já é nosso (an_redir), e resolveFinal/isForeign são lógica de ML.
+    if (o.store === "shopee" || /s\.shopee\.com\.br/i.test(String(o.link || ""))) { safe++; continue; }
     const finalUrl = await resolveFinal(o.link);
     if (!isForeign(finalUrl, tag)) { safe++; continue; }
     const mlId = o.mlId || mlIdFromUrl(finalUrl) || mlIdFromUrl(o.link);

@@ -24,6 +24,8 @@ export async function onRequestGet(context) {
     : [];
   const others = sortByDateDesc(sameTag.length ? sameTag : pool).slice(0, 3);
   const link = safeUrl(offer.link) || "#";
+  // Loja da oferta (ML ou Shopee) — parametriza copy/CTA/schema p/ não "mentir" a loja.
+  const loja = offer.seller || "Mercado Livre";
   const seoTitle = offer.seoTitle || `${offer.title} em oferta — ${SITE.name}`;
   const seoDescription =
     offer.seoDescription ||
@@ -48,7 +50,7 @@ export async function onRequestGet(context) {
       priceValidUntil,
       itemCondition: "https://schema.org/NewCondition",
       availability: "https://schema.org/InStock",
-      seller: { "@type": "Organization", name: "Mercado Livre" },
+      seller: { "@type": "Organization", name: loja },
       areaServed: { "@type": "Country", name: "Brasil" }
     }
   };
@@ -72,7 +74,7 @@ export async function onRequestGet(context) {
   const hashtags = [];
   if (offer.store) {
     hashtags.push(
-      `<a class="taglink taglink--store" href="/?q=${encodeURIComponent("mercado livre")}">#${escapeHtml(humanizeTag(offer.store)).replace(/\s+/g, "")}</a>`
+      `<a class="taglink taglink--store" href="/?q=${encodeURIComponent(loja)}">#${escapeHtml(humanizeTag(offer.store)).replace(/\s+/g, "")}</a>`
     );
   }
   if (offer.coupon && (offer.coupon.code || offer.coupon.campaignId)) {
@@ -96,7 +98,7 @@ export async function onRequestGet(context) {
            ${
              offer.coupon.code
                ? `<button type="button" class="detail__coupon-code" data-coupon="${escapeHtml(offer.coupon.code)}" aria-label="Copiar cupom ${escapeHtml(offer.coupon.code)}"><code>${escapeHtml(offer.coupon.code)}</code><span class="detail__coupon-copy">Copiar</span></button>`
-               : `<span class="detail__coupon-auto">Desconto já aplicado ao abrir no Mercado Livre.</span>`
+               : `<span class="detail__coupon-auto">Desconto já aplicado ao abrir na ${escapeHtml(loja)}.</span>`
            }
          </div>
        </div>`
@@ -135,9 +137,9 @@ export async function onRequestGet(context) {
           </div>
           ${couponHtml}
           <a class="btn btn--primary detail__cta" href="${link}" target="_blank" rel="noopener nofollow sponsored">
-            Aproveitar no Mercado Livre
+            Aproveitar na ${escapeHtml(loja)}
           </a>
-          <p class="detail__legal">Você é redirecionado para o Mercado Livre, onde a compra é finalizada com a proteção da plataforma.</p>
+          <p class="detail__legal">Você é redirecionado para a ${escapeHtml(loja)}, onde a compra é finalizada com a proteção da plataforma.</p>
           ${
             offer.description
               ? `<p class="detail__desc">${escapeHtml(offer.description)}</p>`
@@ -149,9 +151,9 @@ export async function onRequestGet(context) {
               : ""
           }
           <ul class="detail__bullets">
-            <li>Entrega pra todo o Brasil pelo Mercado Livre.</li>
+            <li>Entrega pra todo o Brasil pela ${escapeHtml(loja)}.</li>
             <li>Curadoria manual da Delma — só publico se eu compraria.</li>
-            <li>Compra no Mercado Livre, com proteção da plataforma.</li>
+            <li>Compra na ${escapeHtml(loja)}, com proteção da plataforma.</li>
           </ul>
           <p class="detail__reportline">
             <button type="button" class="detail__report" data-report="${escapeHtml(offer.id)}">⚠️ Reportar oferta quebrada ou esgotada</button>

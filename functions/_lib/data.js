@@ -12,15 +12,21 @@ export async function loadOffers(env) {
   }
 }
 
-// Nossa tag de afiliado (não é segredo; é a default do código).
+// Nossas tags de afiliado (não são segredo; são a default do código). ML = sade9179546;
+// Shopee = affiliate_id que a NOSSA API injeta no s.shopee.com.br/an_redir.
 export const OUR_TAG = "sade9179546";
+export const OUR_SHOPEE_AFFID = "18325641094";
 
-// A oferta tem o NOSSO link de afiliado? (meli.la ou /social/<nossa-tag>). Só essas
-// devem aparecer na vitrine — URL limpa `produto.mercadolivre.com.br/MLB-` pode estar
-// quebrada (não vale pra produto de catálogo) e ainda não está monetizada.
+// A oferta tem o NOSSO link de afiliado? Só essas aparecem na vitrine. ML: meli.la ou
+// /social/<nossa-tag>. Shopee: an_redir COM o NOSSO affiliate_id (an_redir de terceiro,
+// com outro id, NÃO passa — fail-closed, nunca paga comissão pro concorrente).
 export function hasOurLink(offer) {
   const l = String((offer && offer.link) || "").toLowerCase();
-  return /(?:^|\/\/)meli\.la\//.test(l) || l.includes("/social/" + OUR_TAG);
+  return (
+    /(?:^|\/\/)meli\.la\//.test(l) ||
+    l.includes("/social/" + OUR_TAG) ||
+    (l.includes("s.shopee.com.br/an_redir") && l.includes("affiliate_id=" + OUR_SHOPEE_AFFID))
+  );
 }
 
 // Carregamento PÚBLICO: só ofertas com o nosso link (sem link bom = não aparece).
@@ -169,8 +175,15 @@ export function mlIdFromUrl(value) {
 export function findDuplicateIndex(offers, incoming) {
   const id = incoming.mlId;
   const link = normalizeLink(incoming.link);
+  // Shopee não tem mlId; o `link` salvo é o an_redir (shortcode opaco, não casa entre
+  // formatos do mesmo produto). O `sourceUrl` guarda a URL canônica estável
+  // (shopee.com.br/product/<shop>/<item>) — é a chave de identidade do produto Shopee.
+  const src = normalizeLink(incoming.sourceUrl);
   return offers.findIndex(
-    (o) => (id && o.mlId && o.mlId === id) || (link && normalizeLink(o.link) === link)
+    (o) =>
+      (id && o.mlId && o.mlId === id) ||
+      (src && o.sourceUrl && normalizeLink(o.sourceUrl) === src) ||
+      (link && normalizeLink(o.link) === link)
   );
 }
 

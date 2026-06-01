@@ -3,7 +3,7 @@
 // de confirmação. Bloqueia spam por rate-limit simples por IP.
 
 import { scrapeOffer, enrichOffer } from "./_lib/scraper.js";
-import { scrapeShopee, isShopeeUrl } from "./_lib/shopee.js";
+import { scrapeShopee, isShopeeUrl, shopeeIds, shopeeCanonical } from "./_lib/shopee.js";
 import {
   loadOffers,
   saveOffers,
@@ -95,18 +95,32 @@ async function handle(context, method) {
     let apiLink = null;
     const api = await completeOffer(target, env);
     if (api && api.link && api.image) {
-      const mlId = mlIdFromUrl(target) || "";
+      const store = isShopee ? "Shopee" : "Mercado Livre";
+      let mlId = "";
+      let productUrl;
+      let sourceUrl;
+      if (isShopee) {
+        // Shopee não tem mlId; URL canônica = chave de dedup estável + link limpo (compliance).
+        const ids = shopeeIds(target);
+        const canonical = ids ? shopeeCanonical(ids.shopid, ids.itemid) : target;
+        productUrl = canonical;
+        sourceUrl = canonical;
+      } else {
+        mlId = mlIdFromUrl(target) || "";
+        productUrl = mlId ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}` : target;
+        sourceUrl = target;
+      }
       const base = {
         url: target,
         raw: { title: api.name, image: api.image, priceCurrent: api.price, priceOld: null, discount: null, bestseller: false },
         coupon: null,
         mlId,
-        productUrl: mlId ? `https://produto.mercadolivre.com.br/${mlId.replace("MLB", "MLB-")}` : target,
-        sourceUrl: target
+        productUrl,
+        sourceUrl
       };
-      scraped = await enrichOffer(base, env); // Gemini só pra copy (título/seo/tags)
+      scraped = await enrichOffer(base, env, store); // Gemini só pra copy (título/seo/tags)
       scraped.image = api.image;
-      if (isShopee) scraped.seller = "Shopee";
+      if (isShopee) scraped.store = "shopee";
       apiLink = api.link; // NOSSO link de afiliado (já veio da API)
     } else {
       scraped = isShopee ? await scrapeShopee(target, env) : await scrapeOffer(target, env);
