@@ -378,6 +378,29 @@ apontou as URLs certas. **Correção honesta:** na 6.9 dei "Pelando inviável" t
   `string` → `{url, coupon}`** — `discoverMlOffers` normaliza/dedup por url, `bot.js` propaga o cupom
   (prefere o código digitável da fonte ao `campaignId` do ML). Validado: 62 candidatos, 8 com cupom.
 
+### 6.10 API de afiliado NOVA + geração na hora (sem EC2)  ✅ (2026-06-01)
+
+Troca da API `gerador-link-afiliados` (EC2 IP:8000, sob demanda) pela **`gerador-aff-links`**:
+- **Base = HOSTNAME HTTPS** `https://5w5vp82y5k.softuria.com` (alcançável pelo edge; fim do
+  bloqueio IP:8000). **Sempre ligada** (`/health` mostra `ml_session:true`). **Bearer token.**
+  Endpoint `POST /afiliado` (era `/v2/generate`); envelope `{ok, resultados:[{ok, short_url, tag}]}`;
+  aceita `{url}` ou `{urls:[]}` (lote ≤20). Tag `sade9179546`. Secrets do GitHub: `AFFILIATE_API_BASE`
+  + `AFFILIATE_API_TOKEN` (token NUNCA no repo público). `affiliate.js` (edge) lê `AFFILIATE_API_URL`+
+  `AFFILIATE_API_TOKEN` do env.
+- **🔴 URL que a API ACEITA:** `meli.la` e o destino **`/social/...?ref=` já resolvido**. **REJEITA**
+  `produto.mercadolivre.com.br/MLB-`, `/p/<itemId>` e `mercadolivre.com/sec/` crus. Por isso o relink
+  **resolve cada link ao /social** (curl -L) antes de mandar.
+- **Geração NA HORA, um cron só.** Acabou o cron de 6h do relink e a EC2. Único agendamento = a **busca
+  (`bot.yml`, 10min)**. Quando captura algo (`added+corrected>0`), o link é gerado **na mesma run**:
+  `bot.yml` chama `relink.yml` como **job reusable** (`workflow_call`, `secrets: inherit`). `relink.yml`
+  mantém `workflow_dispatch` (seed/compliance manual). `/health` fora → run VERDE com warning (não é bug;
+  relinka na próxima busca). `concurrency: bot-offers` serializa runs (protege o KV de chave única).
+- **Vitrine só mostra oferta COM nosso link** (`hasOurLink`/`loadPublicOffers` em `data.js`): a URL limpa
+  provisória (`produto/MLB-`) pode estar QUEBRADA (não vale p/ catálogo) → oferta sem nosso link **fica
+  escondida** até relinkar. Link quebrado NUNCA aparece. Validado em prod: 107/107 com nosso link, 0 escondidas.
+- Decidido em **War Room** (CI maker + devil release): failure isolation, proteção de KV, manual intacto,
+  sem disparo duplo, menos privilégio. As pendências de segurança/EC2 antigas saem do standby como **obsoletas**.
+
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
 O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava
