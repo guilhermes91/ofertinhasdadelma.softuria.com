@@ -175,15 +175,17 @@ export function mlIdFromUrl(value) {
 export function findDuplicateIndex(offers, incoming) {
   const id = incoming.mlId;
   const link = normalizeLink(incoming.link);
-  // Shopee não tem mlId; o `link` salvo é o an_redir (shortcode opaco, não casa entre
-  // formatos do mesmo produto). O `sourceUrl` guarda a URL canônica estável
-  // (shopee.com.br/product/<shop>/<item>) — é a chave de identidade do produto Shopee.
+  // Shopee: o `link` é o an_redir (shortcode opaco). normalizeLink corta a query e TODO
+  // an_redir vira a MESMA string ("s.shopee.com.br/an_redir") → casaria errado entre
+  // produtos diferentes. Por isso o match por link NÃO vale pra an_redir; Shopee casa só
+  // pela URL canônica (sourceUrl = shopee.com.br/product/<shop>/<item>), que é única.
+  const isOpaque = /s\.shopee\.com\.br\/an_redir/i.test(incoming.link || "");
   const src = normalizeLink(incoming.sourceUrl);
   return offers.findIndex(
     (o) =>
       (id && o.mlId && o.mlId === id) ||
       (src && o.sourceUrl && normalizeLink(o.sourceUrl) === src) ||
-      (link && normalizeLink(o.link) === link)
+      (!isOpaque && link && normalizeLink(o.link) === link)
   );
 }
 
