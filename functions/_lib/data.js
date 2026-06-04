@@ -408,3 +408,28 @@ export function isMercadoLivreUrl(value) {
     return false;
   }
 }
+
+// ---- Hospedagem própria de imagens (R2) ----
+// A imagem do produto é COPIADA pro nosso bucket R2 e servida do nosso domínio (/img/<key>),
+// pra não depender do CDN da fonte (que pode bloquear/expirar/remover). A chave é o hash da
+// URL-fonte → dedup automático (mesma foto-fonte = mesma key = 1 objeto no R2). O upload roda
+// num endpoint SEPARADO (/api/mirror, cron próprio), nunca no caminho do bot.
+const IMG_EXT = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" };
+
+export async function mirrorKey(srcUrl, store = "ml", contentType = "") {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(srcUrl || "")));
+  const hex = Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+  const s = store === "shopee" ? "shopee" : "ml";
+  const ct = String(contentType || "").toLowerCase().split(";")[0].trim();
+  let ext = IMG_EXT[ct] || "";
+  if (!ext) {
+    const m = /\.(png|webp|gif|avif|jpe?g)(\?|$)/i.exec(String(srcUrl || ""));
+    ext = m ? m[1].toLowerCase().replace("jpeg", "jpg") : "jpg";
+  }
+  return `${s}/${hex.slice(0, 40)}.${ext}`;
+}
+
+// Já é uma imagem hospedada por nós? (path /img/<store>/) → não re-espelha.
+export function isHostedImage(url) {
+  return /\/img\/(?:ml|shopee)\//.test(String(url || ""));
+}

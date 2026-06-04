@@ -16,13 +16,14 @@ export async function onRequest(context) {
   const isRelink = path === "/api/relink";
   const isRefresh = path === "/api/refresh";
   const isReport = path === "/api/report";
+  const isMirror = path === "/api/mirror";
   const isWrite = isApi && !READ_METHODS.has(method);
 
-  // /captar, /api/bot, /api/shopee, /api/relink, /api/refresh e /api/report são públicos de
-  // propósito: bot/shopee/relink/refresh têm token próprio (BOT_TOKEN); report é rate-limited
-  // por IP. /api/expire continua exigindo Basic Auth (admin).
+  // /captar, /api/bot, /api/shopee, /api/relink, /api/refresh, /api/report e /api/mirror são
+  // públicos de propósito: bot/shopee/relink/refresh/mirror têm token próprio (BOT_TOKEN);
+  // report é rate-limited por IP. /api/expire continua exigindo Basic Auth (admin).
   const requiresAuth =
-    isAdminPage || isScrape || (isWrite && !isBot && !isShopee && !isRelink && !isRefresh && !isReport);
+    isAdminPage || isScrape || (isWrite && !isBot && !isShopee && !isRelink && !isRefresh && !isReport && !isMirror);
 
   if (requiresAuth && !checkBasicAuth(request, env)) {
     return unauthorized();

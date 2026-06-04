@@ -30,14 +30,17 @@ export default {
       console.error("BOT_TOKEN ausente no Worker — captação abortada (setar via secret).");
       return;
     }
-    // O minuto do disparo decide a fonte. 7 e 37 = Shopee; o resto (*/10) = Mercado Livre.
+    // O minuto do disparo decide a tarefa. 7,37 = Shopee; 4,24 = mirror de imagens (R2);
+    // o resto (*/10) = Mercado Livre.
     const min = new Date(event.scheduledTime).getUTCMinutes();
     const isShopee = min === 7 || min === 37;
+    const isMirror = min === 4 || min === 24;
     // ctx.waitUntil: mantém o Worker vivo até a Function responder (dezenas de s com Gemini);
     // sem isto o runtime mata o processo antes de captar.
     ctx.waitUntil(
-      isShopee ? hit("/api/shopee?max=2", token, site)
-               : hit("/api/bot?max=6", token, site)
+      isMirror ? hit("/api/mirror?max=12", token, site)
+        : isShopee ? hit("/api/shopee?max=2", token, site)
+          : hit("/api/bot?max=6", token, site)
     );
   }
 };
