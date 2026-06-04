@@ -459,6 +459,37 @@ efêmero nunca casa o dedup barato por URL → raspado todo run → bump. O dono
 - Validado: 12 casos-limite de `shouldRepost` (centavo→não; 3%/R$5/48h→sim; subiu/igual/sem-data→não).
   War Room (maker + devil); o devil mudou a regra (threshold material em vez de "menor literal").
 
+### 6.13 Hospedagem PRÓPRIA de imagens no R2  ✅ (2026-06-04)
+
+**Motivação do dono:** parar de depender do CDN da fonte (ML `mlstatic.com`, Shopee
+`susercontent.com`) — que pode bloquear/expirar/remover — e ter "propriedade de hospedagem" de
+TODAS as imagens. (Gatilho: "imagem da Shopee não gera". Investigação: o CDN da Shopee NÃO
+bloqueia — devolve 200 inclusive sem referer; sem CSP. As Shopee salvas renderizam. O "não gera"
+provável é a API de scrape devolver imagem vazia em alguns produtos → recusados no gate. Hospedar
+não conserta isso — é fix de captura separado, se voltar a aparecer.)
+
+**Solução (War Room infra; devil barrou "hospedar tudo na captura" e "proxy-cache=posse"):**
+**Cloudflare R2** (storage durável, free 10GB + egress grátis). **Tudo provisionado por automação,
+ZERO ação no painel:** bucket `ofertinhas-img` criado via `wrangler r2 bucket create` (GH Actions
+`r2-setup.yml`); binding `IMG_BUCKET` adicionado ao Pages via **PATCH aditivo na API**
+(`deployment_configs.production.r2_buckets`) — com verificação pós-PATCH de que `OFFERS_KV` e os
+secrets (Gemini/Afiliado/Shopee) sobreviveram (o PATCH faz merge, não substitui). R2 já estava
+ativo na conta (cartão já cadastrado) e o `CLOUDFLARE_API_TOKEN` tem escopo R2.
+
+- **`functions/img/[[path]].js`**: serve `/img/<store>/<hash>.<ext>` do R2 (`IMG_BUCKET.get`, binding
+  = sem subrequest), `Cache-Control: immutable` + Cache API → após o 1º hit a borda serve sem invocar
+  a Function (validado: 2º hit = `cf-cache-status: HIT`).
+- **`functions/api/mirror.js`** (cron própria, ISOLADA do bot — não pesa no orçamento ~50): espelha
+  N imagens/run pro R2 e reescreve `offer.image` pra URL **absoluta** `${SITE.origin}/img/<key>`
+  (absoluta porque `offerCard` usa `safeUrl`, que rejeita relativa → zero mudança de template; card/
+  OG/JSON-LD/sitemap passam a servir do nosso domínio). `put` ANTES de reescrever → a key sempre
+  existe. Token-gated, isento no `_middleware`, compartilha `bot:lock`. `mirrorKey` = SHA-256 da
+  URL-fonte (dedup). `isHostedImage` pula o que já é nosso (idempotente).
+- **Worker `captador`**: slot de cron **`4,24`** → `/api/mirror?max=12` (novas ofertas espelhadas em
+  ~min). Backfill manual: workflow `mirror.yml`. Backfill das 341 existentes: COMPLETO (100% no nosso
+  domínio, incl. Shopee; última rodada `mirrored:0`).
+- Bônus: OG da Shopee vira `.jpg`/`.webp` do nosso domínio (melhor preview no WhatsApp).
+
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
 O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava
