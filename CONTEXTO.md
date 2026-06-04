@@ -476,7 +476,9 @@ ZERO ação no painel:** bucket `ofertinhas-img` criado via `wrangler r2 bucket 
 secrets (Gemini/Afiliado/Shopee) sobreviveram (o PATCH faz merge, não substitui). R2 já estava
 ativo na conta (cartão já cadastrado) e o `CLOUDFLARE_API_TOKEN` tem escopo R2.
 
-- **`functions/img/[[path]].js`**: serve `/img/<store>/<hash>.<ext>` do R2 (`IMG_BUCKET.get`, binding
+- **`functions/img/[[path]].js`**: serve `/img/<hash>.<ext>` do R2 (path ÚNICO, sem prefixo de loja —
+  unificado em 2026-06-04, o hash já é globalmente único; o `/api/mirror` re-keya o path antigo
+  `/img/ml|shopee/` copiando o objeto no R2) (`IMG_BUCKET.get`, binding
   = sem subrequest), `Cache-Control: immutable` + Cache API → após o 1º hit a borda serve sem invocar
   a Function (validado: 2º hit = `cf-cache-status: HIT`).
 - **`functions/api/mirror.js`** (cron própria, ISOLADA do bot — não pesa no orçamento ~50): espelha
