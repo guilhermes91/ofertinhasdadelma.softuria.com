@@ -1,0 +1,38 @@
+name: Mirror de imagens (R2 backfill manual)
+
+# Dispara o /api/mirror (espelha imagens pro R2). A cadência normal é a cron do Worker
+# (minutos 4,24); este workflow é pra BACKFILL manual acelerado das existentes. Token-gated.
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: "Máx. de imagens por chamada"
+        required: false
+        default: "30"
+      rounds:
+        description: "Quantas chamadas em sequência"
+        required: false
+        default: "1"
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar /api/mirror
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          MAX: ${{ github.event.inputs.max || '30' }}
+          ROUNDS: ${{ github.event.inputs.rounds || '1' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BOT_TOKEN" ]; then echo "::error::Secret BOT_TOKEN ausente."; exit 1; fi
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+          for i in $(seq 1 "$ROUNDS"); do
+            echo "== rodada $i/$ROUNDS (max=$MAX) =="
+            code=$(curl -sS -w '%{http_code}' -o resp.json --max-time 120 -X POST \
+              "https://ofertinhasdadelma.softuria.com/api/mirror?max=$MAX" \
+              -H "Authorization: Bearer $BOT_TOKEN" -A "$UA")
+            echo "HTTP $code"; cat resp.json; echo ""
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then echo "::error::mirror HTTP $code"; exit 1; fi
+            sleep 3
+          done
