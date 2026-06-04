@@ -30,3 +30,23 @@ jobs:
           curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/ofertinhasdadelma" \
             | jq '{success, errors, prodKeys: (.result.deployment_configs.production | keys), kv: (.result.deployment_configs.production.kv_namespaces // {} | keys), r2: (.result.deployment_configs.production.r2_buckets // {} | keys), vars: (.result.deployment_configs.production.env_vars // {} | keys)}'
+
+      - name: Plugar R2 (PATCH ADITIVO) + verificar que KV/secrets sobreviveram
+        run: |
+          echo "== PATCH: adiciona binding IMG_BUCKET -> ofertinhas-img (merge, não toca o resto) =="
+          curl -s -X PATCH -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/ofertinhasdadelma" \
+            --data '{"deployment_configs":{"production":{"r2_buckets":{"IMG_BUCKET":{"name":"ofertinhas-img"}}}}}' \
+            | jq '{success, errors}'
+          echo "== VERIFICAÇÃO pós-PATCH (KV + vars TÊM que continuar lá) =="
+          OUT=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/ofertinhasdadelma")
+          echo "$OUT" | jq '{kv: (.result.deployment_configs.production.kv_namespaces // {} | keys), r2: (.result.deployment_configs.production.r2_buckets // {} | keys), vars: (.result.deployment_configs.production.env_vars // {} | keys)}'
+          KV=$(echo "$OUT" | jq -r '.result.deployment_configs.production.kv_namespaces.OFFERS_KV.namespace_id // empty')
+          R2=$(echo "$OUT" | jq -r '.result.deployment_configs.production.r2_buckets.IMG_BUCKET.name // empty')
+          NV=$(echo "$OUT" | jq -r '.result.deployment_configs.production.env_vars | length')
+          echo "KV OFFERS_KV id presente? ${KV:+SIM} | R2 IMG_BUCKET=$R2 | nº de env_vars=$NV"
+          if [ -z "$KV" ] || [ "$R2" != "ofertinhas-img" ] || [ "$NV" -lt 4 ]; then
+            echo "::error::PATCH pode ter danificado a config (KV/vars/R2). REVISAR ANTES DE DEPLOYAR."; exit 1
+          fi
+          echo "OK — R2 plugado, KV e secrets intactos."
