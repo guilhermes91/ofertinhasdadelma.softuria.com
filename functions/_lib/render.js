@@ -124,7 +124,7 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="preconnect" href="https://http2.mlstatic.com" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=20260531a" />
+  <link rel="stylesheet" href="/styles.css?v=20260604a" />
   ${ldBlocks}
 </head>
 <body>
@@ -295,12 +295,13 @@ export function offerCard(offer) {
 export function pagination({ page, totalPages, baseQuery = "" }) {
   if (totalPages <= 1) return "";
   const q = baseQuery ? `${baseQuery}&` : "";
-  const link = (n, label, current) =>
+  // rel=prev/next: SEO/acessibilidade E âncora robusta p/ a rolagem infinita (client.js).
+  const link = (n, label, current, rel) =>
     current
       ? `<span class="page-link page-link--current" aria-current="page">${label}</span>`
-      : `<a class="page-link" href="?${q}page=${n}">${label}</a>`;
+      : `<a class="page-link"${rel ? ` rel="${rel}"` : ""} href="?${q}page=${n}">${label}</a>`;
   const items = [];
-  if (page > 1) items.push(link(page - 1, "‹ Anterior", false));
+  if (page > 1) items.push(link(page - 1, "‹ Anterior", false, "prev"));
   const window = 2;
   const start = Math.max(1, page - window);
   const end = Math.min(totalPages, page + window);
@@ -313,7 +314,7 @@ export function pagination({ page, totalPages, baseQuery = "" }) {
     if (end < totalPages - 1) items.push(`<span class="page-ellipsis">…</span>`);
     items.push(link(totalPages, String(totalPages), false));
   }
-  if (page < totalPages) items.push(link(page + 1, "Próxima ›", false));
+  if (page < totalPages) items.push(link(page + 1, "Próxima ›", false, "next"));
   return `<nav class="pagination" aria-label="Navegação de páginas">${items.join("")}</nav>`;
 }
 

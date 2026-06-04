@@ -80,4 +80,110 @@
       }
     });
   });
+
+  // Rolagem infinita (progressive enhancement): substitui a paginação por carregamento
+  // contínuo, REUSANDO as páginas SSR (?page=N) — sem API nova. Mantém as URLs paginadas +
+  // rel=next no DOM (SEO; a paginação só some VISUALMENTE). Sem JS / sem IntersectionObserver
+  // / erro de rede → a paginação normal continua funcionando (fallback garantido).
+  (function infiniteScroll() {
+    if (!("IntersectionObserver" in window) || typeof DOMParser === "undefined") return;
+    var pager = document.querySelector(".pagination");
+    if (!pager) return;
+    var firstNext = pager.querySelector('a[rel="next"]');
+    if (!firstNext) return;
+    var container = pager.parentElement;
+    var grid = container.querySelector(".offers__grid");
+    if (!grid) return;
+
+    // Resolve a URL absoluta e preserva o sort atual (o rel=next não carrega sort, de
+    // propósito, p/ não poluir o canônico — então reinjetamos no client).
+    function resolve(href) {
+      var u = new URL(href, location.href);
+      var cur = new URLSearchParams(location.search).get("sort");
+      if (cur && !u.searchParams.get("sort")) u.searchParams.set("sort", cur);
+      return u.href;
+    }
+
+    var nextUrl = resolve(firstNext.getAttribute("href"));
+    var loading = false;
+    var done = false;
+
+    pager.hidden = true; // some da vista, mas continua no DOM (rastreável)
+
+    var status = document.createElement("p");
+    status.className = "infinite-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    var sentinel = document.createElement("div");
+    sentinel.className = "infinite-sentinel";
+    sentinel.setAttribute("aria-hidden", "true");
+    container.insertBefore(status, pager);
+    container.insertBefore(sentinel, status);
+
+    function setLoading(on, msg) {
+      status.classList.toggle("infinite-status--loading", !!on);
+      status.textContent = msg || "";
+    }
+    function stop() {
+      done = true;
+      loading = false;
+      io.disconnect();
+      if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel);
+    }
+    function fallbackToPager() {
+      // erro de rede: restaura a paginação manual e encerra a rolagem infinita
+      setLoading(false, "");
+      pager.hidden = false;
+      stop();
+    }
+
+    function load() {
+      if (loading || done || !nextUrl) return;
+      loading = true;
+      setLoading(true, "Carregando mais ofertas…");
+      fetch(nextUrl, { credentials: "same-origin" })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.text();
+        })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, "text/html");
+          var items = doc.querySelectorAll(".offers__grid > li");
+          if (!items.length) {
+            setLoading(false, "");
+            stop();
+            return;
+          }
+          var frag = document.createDocumentFragment();
+          for (var i = 0; i < items.length; i++) {
+            frag.appendChild(document.importNode(items[i], true));
+          }
+          grid.appendChild(frag);
+          var nl = doc.querySelector('.pagination a[rel="next"]');
+          nextUrl = nl ? resolve(nl.getAttribute("href")) : null;
+          loading = false;
+          setLoading(false, "");
+          if (!nextUrl) {
+            stop();
+            return;
+          }
+          // tela grande: se o sentinel ainda está visível, já busca a próxima
+          if (sentinel.getBoundingClientRect().top < window.innerHeight + 400) load();
+        })
+        .catch(fallbackToPager);
+    }
+
+    var io = new IntersectionObserver(
+      function (entries) {
+        for (var i = 0; i < entries.length; i++) {
+          if (entries[i].isIntersecting) {
+            load();
+            break;
+          }
+        }
+      },
+      { rootMargin: "600px 0px" } // pré-carrega antes de chegar no fim
+    );
+    io.observe(sentinel);
+  })();
 })();
