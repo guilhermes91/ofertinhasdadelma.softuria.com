@@ -1,0 +1,25 @@
+name: R2 setup (criar bucket de imagens)
+
+# Cria o bucket R2 `ofertinhas-img` (depósito das imagens hospedadas por nós) usando o
+# CLOUDFLARE_API_TOKEN que já existe. Diagnóstico: lista os buckets antes (mostra se o R2
+# está ativo e se o token tem permissão de R2). Manual (workflow_dispatch).
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Diagnóstico — listar buckets R2 (mostra se R2 está ativo + token tem permissão)
+        run: |
+          echo "== wrangler r2 bucket list =="
+          npx --yes wrangler@3 r2 bucket list || echo "::warning::list falhou (R2 talvez inativo OU token sem permissão R2)"
+      - name: Criar bucket ofertinhas-img (idempotente — se já existe, segue)
+        run: |
+          echo "== criando bucket =="
+          npx --yes wrangler@3 r2 bucket create ofertinhas-img || echo "::warning::create falhou (ver mensagem acima)"
+          echo "== lista final =="
+          npx --yes wrangler@3 r2 bucket list || true
