@@ -1,5 +1,5 @@
 // Serve as imagens hospedadas por nós a partir do R2 (binding IMG_BUCKET). Rota: /img/<key>
-// (ex.: /img/shopee/<hash>.jpg). Cacheado na borda como immutable — depois do 1º hit, a
+// (ex.: /img/<hash>.jpg — path único, sem prefixo de loja). Cacheado na borda como immutable — depois do 1º hit, a
 // Cloudflare serve sem nem invocar a Function. R2 via binding NÃO gasta subrequest.
 // O /api/mirror só reescreve offer.image PRA ESTE caminho DEPOIS de gravar no R2 (put antes
 // de reescrever) → a key sempre existe quando alguém a pede; miss real só se o objeto sumir.

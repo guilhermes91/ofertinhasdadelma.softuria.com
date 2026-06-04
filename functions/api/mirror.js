@@ -50,8 +50,27 @@ async function run(context) {
     for (const o of offers) {
       if (mirrored.length >= max) break;
       const src = o.image;
-      // já hospedada por nós, vazia ou não-http → pula
-      if (!src || isHostedImage(src) || !/^https?:\/\//i.test(src)) continue;
+      if (!src) continue;
+
+      // Migração de path: imagem hospedada no path ANTIGO /img/ml|shopee/<hash> → move pro path
+      // ÚNICO /img/<hash> (copia o objeto no R2; o hash é o mesmo, só tira o prefixo de loja).
+      if (/\/img\/(?:ml|shopee)\//.test(src)) {
+        const oldKey = src.slice(src.indexOf("/img/") + 5); // "ml/<hash>.ext"
+        const newKey = oldKey.replace(/^(?:ml|shopee)\//, ""); // "<hash>.ext"
+        try {
+          const obj = await env.IMG_BUCKET.get(oldKey);
+          if (!obj) { errors.push({ slug: o.slug, reason: "objeto antigo ausente no R2" }); continue; }
+          await env.IMG_BUCKET.put(newKey, obj.body, { httpMetadata: obj.httpMetadata });
+          if (!dry) { o.image = `${SITE.origin}/img/${newKey}`; changed = true; }
+          mirrored.push({ slug: o.slug, key: newKey, reKeyed: true });
+        } catch (err) {
+          errors.push({ slug: o.slug, reason: err.message || "falha re-key" });
+        }
+        continue;
+      }
+
+      // já hospedada (path único) ou não-http → pula
+      if (isHostedImage(src) || !/^https?:\/\//i.test(src)) continue;
       try {
         const r = await fetch(src, { headers: { "User-Agent": UA }, cf: { cacheTtl: 3600 } });
         const ct = r.headers.get("content-type") || "";
@@ -59,7 +78,7 @@ async function run(context) {
           errors.push({ slug: o.slug, reason: `fonte ${r.status} ${ct || "?"}` });
           continue;
         }
-        const key = await mirrorKey(src, o.store, ct);
+        const key = await mirrorKey(src, ct);
         // put ANTES de reescrever: garante que /img/<key> existe quando a oferta apontar pra ela
         await env.IMG_BUCKET.put(key, r.body, { httpMetadata: { contentType: ct } });
         if (!dry) {
