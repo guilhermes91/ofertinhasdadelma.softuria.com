@@ -29,4 +29,4 @@ jobs:
           echo "== estrutura atual de bindings/vars do projeto Pages (só as CHAVES) =="
           curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/ofertinhasdadelma" \
-            | jq '{success, errors, prod: (.result.deployment_configs.production | {kv_namespaces: (.kv_namespaces|keys), r2_buckets: (.r2_buckets|keys), env_vars: (.env_vars|keys), services: (.services|keys), d1: (.d1_databases|keys)})}'
+            | jq '{success, errors, prodKeys: (.result.deployment_configs.production | keys), kv: (.result.deployment_configs.production.kv_namespaces // {} | keys), r2: (.result.deployment_configs.production.r2_buckets // {} | keys), vars: (.result.deployment_configs.production.env_vars // {} | keys)}'
