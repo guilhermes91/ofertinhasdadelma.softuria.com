@@ -490,6 +490,23 @@ ativo na conta (cartão já cadastrado) e o `CLOUDFLARE_API_TOKEN` tem escopo R2
   domínio, incl. Shopee; última rodada `mirrored:0`).
 - Bônus: OG da Shopee vira `.jpg`/`.webp` do nosso domínio (melhor preview no WhatsApp).
 
+### 6.14 Rolagem infinita (progressive enhancement)  ✅ (2026-06-04)
+
+Trocou a paginação por rolagem infinita usando a solução PADRÃO/madura: **`IntersectionObserver`
+nativo** (sem lib, sem build, sem licença — a "Infinite Scroll" da Metafizzy é licença comercial p/
+site monetizado). REUSA as páginas SSR (`?page=N`) — nenhuma API nova.
+
+- `render.js pagination()`: links de página ganharam **`rel="prev"/"next"`** (SEO/a11y + âncora
+  robusta p/ o JS). `styles.css?v=` bumpado p/ `20260604a` (status "carregando" + spinner).
+- `client.js` (dentro do IIFE existente): ao ligar, esconde a `.pagination` (fica no DOM, rastreável),
+  observa um sentinel após a `.offers__grid` e vai anexando os `.offers__grid > li` das próximas
+  páginas (fetch da página SSR → DOMParser → importNode). Lê o novo `rel=next` de cada página até
+  acabar. Preserva o `sort` atual no client (o rel=next não carrega sort, p/ não poluir o canônico).
+- **SEO preservado:** URLs paginadas + `<link rel=next>` no `<head>` continuam (Google rastreia por
+  baixo; a paginação só some VISUALMENTE). **Fallback garantido:** sem JS / sem IntersectionObserver /
+  erro de rede → a paginação normal volta a aparecer e funciona. Aplica a TODA página com paginação
+  (home, busca, /tag) — o componente é compartilhado.
+
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
 O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava
