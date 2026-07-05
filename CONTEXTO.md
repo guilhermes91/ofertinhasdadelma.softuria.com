@@ -4,7 +4,7 @@
 > projeto, stack, estado atual e decisões em aberto. Mantido vivo: a cada mudança relevante,
 > atualizar + commit + push.
 >
-> Última atualização: 2026-05-30.
+> Última atualização: 2026-07-05.
 
 ---
 
@@ -508,6 +508,42 @@ site monetizado). REUSA as páginas SSR (`?page=N`) — nenhuma API nova.
   baixo; a paginação só some VISUALMENTE). **Fallback garantido:** sem JS / sem IntersectionObserver /
   erro de rede → a paginação normal volta a aparecer e funciona. Aplica a TODA página com paginação
   (home, busca, /tag) — o componente é compartilhado.
+
+### 6.15 "Tudo local, sem AWS" — gerador local + relink direto no KV  ✅ (2026-07-05)
+
+**Contexto:** o dono disse "desativei a AWS, tudo tem de ser local" e pediu URGENTE publicar
+uma oferta (`meli.la/12mJQnR`, link de afiliado que ele **gerou à mão**). Sintoma: a promo não
+publicava e ofertas novas não apareciam.
+
+**Diagnóstico (razão venceu o susto de "AWS caiu"):** o site NUNCA foi AWS — é Cloudflare Pages
++ KV + Worker cron + GitHub Actions. A **única** peça externa é o gerador de link de afiliado
+`gerador-aff-links`, que **já era 100% LOCAL** (Python/FastAPI na máquina Windows, autostart via
+`GeradorAffLinks.vbs` na pasta Inicializar) + exposto por **Cloudflare Tunnel** (`cloudflared`
+local → `5w5vp82y5k.softuria.com` → `localhost:8080`). A causa real do problema era simples: **o
+processo do gerador estava DESLIGADO** (porta 8080 morta) → `generateAffiliate` caía pra `null` →
+capturas salvas com URL limpa → **escondidas** por `hasOurLink` (49 ofertas acumuladas). A AWS não
+tinha a ver.
+
+**Feito nesta sessão:**
+- **Promo publicada na hora** direto no KV (via API do Cloudflare, token do `.env` local). O produto
+  (Smart TV LG QNED73) já existia no catálogo escondido — troquei o `link` pra `meli.la/12mJQnR`
+  (nossa tag `sade9179546`, confirmada) e subi pro topo. Sem duplicar.
+- **Gerador religado** e deixado como processo `pythonw` destacado (sobrevive à sessão); o autostart
+  VBS já cobre reboot. Túnel voltou a servir (edge/GitHub relink também voltaram a monetizar sozinhos).
+- **Relink LOCAL (novo, sem depender de túnel/edge):** `gerador-aff-links/relink-kv.mjs` lê o
+  `offers:all` do KV pela API do Cloudflare, acha as escondidas, gera o link no gerador local
+  (`127.0.0.1:8080/afiliado`) e grava de volta no KV. Rodado agora: **45/49 recuperadas** (451→496
+  visíveis). As 4 que faltam têm `sourceUrl` = `mercadolivre.com/sec/...`, formato que a API rejeita
+  cru → **melhoria pendente**: resolver o `/sec/` pro `/social` antes de mandar.
+- **"Deixar rodando":** tarefa agendada do Windows **`OfertinhasRelinkLocal`** roda
+  `node relink-kv.mjs --once` a cada **15min** (faz **keepalive da sessão ML** + reconcilia
+  escondidas). Reinicia no logon. É o backstop 100% local — mesmo se o túnel/edge cair, a máquina
+  monetiza gravando direto no KV.
+
+**Operar (máquina do dono):** gerador de pé = `GET :8080/health` (`ml_session:true`). Se cair:
+`wscript "…/Startup/GeradorAffLinks.vbs"`. Sessão ML expira por inatividade → o keepalive de 15min
+cobre; se cair, `POST /ml/login`. Publicar manual: pôr a oferta no `/admin/` (o scrape usa o link
+colado como `link`; `meli.la` passa no `hasOurLink` = visível) — não precisa de AWS.
 
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
