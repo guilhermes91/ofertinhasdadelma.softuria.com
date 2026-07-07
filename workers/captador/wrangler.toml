@@ -7,10 +7,13 @@ name = "ofertinhas-captador"
 main = "src/index.js"
 compatibility_date = "2026-06-01"
 
-# ML a cada 10min; Shopee nos minutos 7 e 37 (lenta); mirror de imagens nos minutos 4 e 24.
-# 4,7,24,37 NÃO são múltiplos de 10 → cada disparo é inequívoco (ML, Shopee OU mirror).
+# Crons DESATIVADOS (2026-07-05, §6.16): o único relógio agora é o cron LOCAL horário
+# (tarefa Windows "OfertinhasRelinkLocal" → relink-kv.mjs --cycle), que captura (cutuca
+# /api/bot, /api/shopee, /api/mirror) + relinka em sequência. Lista vazia = Worker não
+# dispara sozinho (segue deployado, sem cron). Reativar = repor os crons abaixo.
+# ["*/10 * * * *" (ML), "7,37 * * * *" (Shopee), "4,24 * * * *" (mirror)]
 [triggers]
-crons = ["*/10 * * * *", "7,37 * * * *", "4,24 * * * *"]
+crons = []
 
 [vars]
 SITE = "https://ofertinhasdadelma.softuria.com"

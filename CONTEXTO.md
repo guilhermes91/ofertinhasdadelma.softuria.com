@@ -545,6 +545,30 @@ tinha a ver.
 cobre; se cair, `POST /ml/login`. Publicar manual: pôr a oferta no `/admin/` (o scrape usa o link
 colado como `link`; `meli.la` passa no `hasOurLink` = visível) — não precisa de AWS.
 
+### 6.16 UM cron só: relógio local horário, captura+relink sequencial  ✅ (2026-07-05)
+
+**Pedido do dono:** "põe ambos os crons de hora em hora; e vê se precisa mesmo de 2 crons —
+não dá pra juntar sequencial?" **Sim, dá.** Antes eram 2 relógios em lugares diferentes: o
+**Worker captador** (`*/10` ML + `7,37` Shopee + `4,24` mirror, dentro da Cloudflare) e a **tarefa
+local** de relink (15min). Motivo de serem separados: a **captura** precisa do IP do edge (o ML só
+entrega HTML cheio pro edge), a **geração da tag** precisa do gerador local.
+
+**Consolidação:** a **máquina do dono vira o ÚNICO relógio**. `relink-kv.mjs --cycle` faz o ciclo
+SEQUENCIAL: (1) **cutuca o edge** (`GET /api/bot?max=6`, `/api/shopee?max=2`, `/api/mirror?max=12`
+com UA de browser + `bot:token` lido do KV) → o scrape roda no edge como sempre; (2) **relinka**
+local (gera nossa tag pras escondidas no gerador 127.0.0.1 + grava no KV + keepalive ML). Provado:
+1 ciclo → bot `added:1`, shopee `added:1`, mirror 4 imgs, relink 1 escondida aplicada.
+
+- **Tarefa Windows `OfertinhasRelinkLocal`** agora roda `node relink-kv.mjs --cycle` **a cada 1h**
+  (era 15min) + no logon. É o relógio.
+- **Worker captador:** crons **zerados** — `schedules:[]` via API **e** `crons = []` no
+  `wrangler.toml` (senão um redeploy re-adicionaria). Segue deployado, só não dispara.
+- **GitHub `bot.yml`/`shopee.yml`:** `schedule` **comentado** (mantido `workflow_dispatch` manual).
+- **Trade-off honesto (aceito pelo dono):** com PC desligado/deslogado, NADA roda (nem captura nem
+  relink) — mas a monetização já dependia do gerador local, então é coerente. Reativar qualquer
+  fallback de nuvem = descomentar os crons. **Keepalive ML** caiu de 15→60min (o `/afiliado` do
+  relink e o `/ml/keepalive` do ciclo aquecem a sessão; se expirar em 1h, re-login).
+
 ### 6.9.5 War Room — auditoria das 4 fontes (cupom+preço corretos)  ✅ (2026-05-31)
 
 O dono apontou que o trabalho foi PORCO: cupom faltando em Promotop/Pelando ("não têm" estava

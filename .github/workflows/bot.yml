@@ -12,8 +12,12 @@ on:
         description: "Máximo de ofertas a capturar nesta execução"
         required: false
         default: "8"
-  schedule:
-    - cron: "5 * * * *"   # de hora em hora (fallback do Worker + backstop do relink)
+  # schedule DESATIVADO (2026-07-05): o ÚNICO relógio agora é o cron LOCAL horário
+  # (tarefa Windows "OfertinhasRelinkLocal" → node relink-kv.mjs --cycle), que faz
+  # captura (cutuca este /api/bot) + relink numa sequência. Ver CONTEXTO §6.16.
+  # Reativar = descomentar (volta a ser fallback horário).
+  # schedule:
+  #   - cron: "5 * * * *"
 
 # Serializa os runs do bot: o KV é uma chave única (offers:all) com read-modify-write
 # sem lock — dois runs sobrepostos se sobrescreveriam (last-write-wins). cancel-in-progress
